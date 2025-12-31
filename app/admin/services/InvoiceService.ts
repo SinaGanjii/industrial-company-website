@@ -2,6 +2,7 @@
 // OOP approach for invoice operations
 
 import type { Invoice, InvoiceItem, Product } from "../types"
+import { getTodayPersianDate } from "../utils/dateUtils"
 
 export class InvoiceService {
   /**
@@ -88,9 +89,35 @@ export class InvoiceService {
     return {
       ...invoice,
       status: "paid",
-      paidDate: new Date().toISOString(),
+      paidDate: getTodayPersianDate(),
       updatedAt: new Date().toISOString(),
     }
+  }
+
+  /**
+   * Convert invoice items to sales entries
+   * Used when invoice is marked as paid
+   */
+  static invoiceToSales(invoice: Invoice): Array<{
+    invoiceId: string
+    customerName: string
+    productId: string
+    productName: string
+    quantity: number
+    unitPrice: number
+    totalPrice: number
+    date: string
+  }> {
+    return invoice.items.map((item) => ({
+      invoiceId: invoice.id,
+      customerName: invoice.customerName,
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.total,
+      date: invoice.paidDate || invoice.date,
+    }))
   }
 
   /**

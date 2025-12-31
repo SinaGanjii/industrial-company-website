@@ -16,7 +16,6 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  Receipt,
   Wallet,
   Factory,
   X,
@@ -34,7 +33,6 @@ import { ProductionManagement } from "./components/ProductionManagement"
 import { CostManagement } from "./components/CostManagement"
 import { SalesManagement } from "./components/SalesManagement"
 import { InvoiceManagement } from "./components/InvoiceManagement"
-import { Reports } from "./components/Reports"
 import { getTodayPersianDate } from "./utils"
 
 export default function AdminPage() {
@@ -206,7 +204,7 @@ export default function AdminPage() {
       {/* Admin Content */}
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue="dashboard" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7 h-auto">
+          <TabsList className="grid w-full grid-cols-6 h-auto">
             <TabsTrigger value="dashboard" className="gap-2 py-3">
               <BarChart3 className="h-4 w-4" />
               داشبورد
@@ -230,10 +228,6 @@ export default function AdminPage() {
             <TabsTrigger value="invoices" className="gap-2 py-3">
               <FileText className="h-4 w-4" />
               فاکتورها
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="gap-2 py-3">
-              <Receipt className="h-4 w-4" />
-              گزارشات
             </TabsTrigger>
           </TabsList>
 
@@ -287,16 +281,17 @@ export default function AdminPage() {
           <TabsContent value="invoices" className="space-y-4">
             <InvoiceManagement
               products={products}
+              productions={productions}
               invoices={invoices}
+              sales={sales}
               onAdd={handleAddInvoice}
               onUpdate={handleUpdateInvoice}
               onDelete={handleDeleteInvoice}
+              onAddSales={(newSales) => {
+                // Add multiple sales at once
+                newSales.forEach((saleData) => handleAddSale(saleData))
+              }}
             />
-          </TabsContent>
-
-          {/* Reports Tab */}
-          <TabsContent value="reports" className="space-y-4">
-            <Reports products={products} productions={productions} sales={sales} costs={costs} />
           </TabsContent>
         </Tabs>
       </div>

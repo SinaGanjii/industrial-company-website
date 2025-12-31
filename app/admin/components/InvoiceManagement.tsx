@@ -7,25 +7,32 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, X, Check, FileText, Download } from "lucide-react"
-import type { Product, Invoice, InvoiceItem } from "../types"
+import type { Product, Invoice, InvoiceItem, Sale, Production } from "../types"
 import { InvoiceService } from "../services/InvoiceService"
+import { StockService } from "../services/StockService"
 import { exportInvoiceToPDF, exportInvoiceToExcel } from "../utils/exportUtils"
 import { getTodayPersianDate, formatPersianNumber } from "../utils"
 
 interface InvoiceManagementProps {
   products: Product[]
+  productions: Production[] // Needed for stock calculation
   invoices: Invoice[]
+  sales: Sale[] // Sales array to check if invoice already created sales
   onAdd: (invoice: Invoice) => void
   onUpdate: (id: string, invoice: Partial<Invoice>) => void
   onDelete: (id: string) => void
+  onAddSales?: (sales: Array<Omit<Sale, "id" | "createdAt">>) => void // Callback to create sales when invoice is paid
 }
 
 export function InvoiceManagement({
   products,
+  productions,
   invoices,
+  sales,
   onAdd,
   onUpdate,
   onDelete,
+  onAddSales,
 }: InvoiceManagementProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [formData, setFormData] = useState({
@@ -44,11 +51,27 @@ export function InvoiceManagement({
     const product = products.find((p) => p.id === selectedProduct)
     if (!product) return
 
+    // Calculate available stock (considering items already in the invoice)
+    const currentStock = StockService.getProductStock(selectedProduct, productions, sales)
+    const quantityInInvoice = formData.items
+      .filter((item) => item.productId === selectedProduct)
+      .reduce((sum, item) => sum + item.quantity, 0)
+    const availableStock = currentStock - quantityInInvoice
+    const requestedQuantity = Number.parseInt(itemQuantity)
+
+    // Check if stock is sufficient
+    if (requestedQuantity > availableStock) {
+      alert(
+        `موجودی کافی نیست.\nموجودی فعلی: ${formatPersianNumber(currentStock)} عدد\nدر فاکتور: ${formatPersianNumber(quantityInInvoice)} عدد\nموجودی قابل استفاده: ${formatPersianNumber(availableStock)} عدد`
+      )
+      return
+    }
+
     setFormData({
       ...formData,
       items: [
         ...formData.items,
-        { productId: selectedProduct, quantity: Number.parseInt(itemQuantity) },
+        { productId: selectedProduct, quantity: requestedQuantity },
       ],
     })
     setSelectedProduct("")
@@ -103,8 +126,20 @@ export function InvoiceManagement({
   }
 
   const handleMarkPaid = (invoice: Invoice) => {
+    // Check if sales already exist for this invoice
+    const existingSales = sales.filter((s) => s.invoiceId === invoice.id)
+    
+    // Mark invoice as paid first to get the paidDate
     const paid = InvoiceService.markAsPaid(invoice)
     onUpdate(invoice.id, paid)
+    
+    // Create sales entries from invoice items if they don't exist yet
+    if (existingSales.length === 0 && onAddSales) {
+      // Use InvoiceService to convert invoice to sales
+      const newSales = InvoiceService.invoiceToSales(paid)
+      // Add all sales at once
+      onAddSales(newSales)
+    }
   }
 
   const handleDelete = (id: string) => {
@@ -185,11 +220,23 @@ export function InvoiceManagement({
                       <SelectValue placeholder="انتخاب محصول" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} - {formatPersianNumber(product.unitPrice)} تومان
-                        </SelectItem>
-                      ))}
+                      {products.map((product) => {
+                        const stock = StockService.getProductStock(product.id, productions, sales)
+                        const quantityInInvoice = formData.items
+                          .filter((item) => item.productId === product.id)
+                          .reduce((sum, item) => sum + item.quantity, 0)
+                        const availableStock = stock - quantityInInvoice
+                        return (
+                          <SelectItem 
+                            key={product.id} 
+                            value={product.id}
+                            disabled={availableStock <= 0}
+                          >
+                            {product.name} - {formatPersianNumber(product.unitPrice)} تومان
+                            {availableStock <= 0 ? " (موجودی: ۰)" : ` (موجودی: ${formatPersianNumber(availableStock)})`}
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                   <Input
@@ -199,11 +246,37 @@ export function InvoiceManagement({
                     placeholder="تعداد"
                     className="w-32"
                     min="1"
+                    max={
+                      selectedProduct
+                        ? (() => {
+                            const stock = StockService.getProductStock(selectedProduct, productions, sales)
+                            const quantityInInvoice = formData.items
+                              .filter((item) => item.productId === selectedProduct)
+                              .reduce((sum, item) => sum + item.quantity, 0)
+                            return stock - quantityInInvoice
+                          })()
+                        : undefined
+                    }
                   />
                   <Button type="button" onClick={handleAddItem}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
+                {selectedProduct && (
+                  <p className="text-xs text-muted-foreground">
+                    موجودی قابل استفاده:{" "}
+                    {formatPersianNumber(
+                      (() => {
+                        const stock = StockService.getProductStock(selectedProduct, productions, sales)
+                        const quantityInInvoice = formData.items
+                          .filter((item) => item.productId === selectedProduct)
+                          .reduce((sum, item) => sum + item.quantity, 0)
+                        return stock - quantityInInvoice
+                      })()
+                    )}{" "}
+                    عدد
+                  </p>
+                )}
               </div>
 
               {formData.items.length > 0 && (
@@ -212,15 +285,30 @@ export function InvoiceManagement({
                   <div className="border rounded-lg p-4 space-y-2">
                     {formData.items.map((item, index) => {
                       const product = products.find((p) => p.id === item.productId)!
+                      const stock = StockService.getProductStock(item.productId, productions, sales)
+                      const quantityInInvoice = formData.items
+                        .filter((i) => i.productId === item.productId)
+                        .slice(0, index + 1)
+                        .reduce((sum, i) => sum + i.quantity, 0)
+                      const availableStock = stock - quantityInInvoice + item.quantity
                       return (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-2 bg-muted rounded"
+                          className={`flex items-center justify-between p-2 rounded ${
+                            availableStock < item.quantity ? "bg-red-500/10 border border-red-500/20" : "bg-muted"
+                          }`}
                         >
-                          <span>
-                            {product.name} × {item.quantity} ={" "}
-                            {formatPersianNumber(product.unitPrice * item.quantity)} تومان
-                          </span>
+                          <div className="flex-1">
+                            <span>
+                              {product.name} × {item.quantity} ={" "}
+                              {formatPersianNumber(product.unitPrice * item.quantity)} تومان
+                            </span>
+                            {availableStock < item.quantity && (
+                              <p className="text-xs text-red-600 mt-1">
+                                ⚠️ موجودی کافی نیست (موجودی: {formatPersianNumber(stock)})
+                              </p>
+                            )}
+                          </div>
                           <Button
                             size="sm"
                             variant="ghost"
