@@ -13,17 +13,23 @@ import {
   InvoicesDB,
 } from "../lib/db"
 
-export function useSupabaseData() {
+export function useSupabaseData(isAuthenticated: boolean = false) {
   const [products, setProducts] = useState<Product[]>([])
   const [productions, setProductions] = useState<Production[]>([])
   const [costs, setCosts] = useState<Cost[]>([])
   const [sales, setSales] = useState<Sale[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Fetch all data
   const fetchAll = useCallback(async () => {
+    if (!isAuthenticated) {
+      console.log("[useSupabaseData] Not authenticated, skipping data fetch")
+      setLoading(false)
+      return
+    }
+
     try {
       console.log("[useSupabaseData] Starting to fetch all data...")
       setLoading(true)
@@ -63,12 +69,23 @@ export function useSupabaseData() {
       setLoading(false)
       console.log("[useSupabaseData] Fetch completed, loading set to false")
     }
-  }, [])
+  }, [isAuthenticated])
 
-  // Load data on mount
+  // Load data only when authenticated
   useEffect(() => {
-    fetchAll()
-  }, [fetchAll])
+    if (isAuthenticated) {
+      fetchAll()
+    } else {
+      // Clear data when not authenticated
+      setProducts([])
+      setProductions([])
+      setCosts([])
+      setSales([])
+      setInvoices([])
+      setError(null)
+      setLoading(false)
+    }
+  }, [isAuthenticated, fetchAll])
 
   // Products operations
   const addProduct = useCallback(

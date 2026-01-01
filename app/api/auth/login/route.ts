@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
       sameSite: "lax",
       expires: expiresAt,
       path: "/",
+      domain: process.env.NODE_ENV === "production" ? undefined : undefined, // Use default domain
     })
 
     return response

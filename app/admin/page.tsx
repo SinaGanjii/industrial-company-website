@@ -42,7 +42,7 @@ function AdminContent() {
   const [credentials, setCredentials] = useState({ username: "", password: "" })
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
-  // Use Supabase data hook
+  // Use Supabase data hook - only load data when authenticated
   const {
     products,
     productions,
@@ -62,7 +62,7 @@ function AdminContent() {
     addInvoice,
     updateInvoice,
     deleteInvoice,
-  } = useSupabaseData()
+  } = useSupabaseData(isAuthenticated)
 
   // Handlers using Supabase
   const handleAddProduct = async (productData: Omit<Product, "id" | "createdAt" | "updatedAt">) => {
