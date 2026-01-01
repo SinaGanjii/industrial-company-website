@@ -29,9 +29,10 @@ export class ProductsDB {
       if (process.env.NODE_ENV === "development") {
         console.error("[ProductsDB.getAll] Error fetching products:", {
           error,
-        errorType: error instanceof Error ? error.constructor.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+      }
       throw new Error(`Failed to fetch products: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -55,7 +56,9 @@ export class ProductsDB {
       const result = await response.json()
       return result.data ? dbProductToTS(result.data) : null
     } catch (error) {
-      console.error("Error fetching product:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching product:", error)
+      }
       throw new Error("Failed to fetch product")
     }
   }
@@ -87,12 +90,14 @@ export class ProductsDB {
       const result = await response.json()
       return dbProductToTS(result.data)
     } catch (error) {
-      console.error("[ProductsDB.create] Error creating product:", {
-        error,
-        product,
-        errorType: error instanceof Error ? error.constructor.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
+      if (process.env.NODE_ENV === "development") {
+        console.error("[ProductsDB.create] Error creating product:", {
+          error,
+          product,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+      }
       throw new Error(`Failed to create product: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -126,7 +131,9 @@ export class ProductsDB {
       const result = await response.json()
       return dbProductToTS(result.data)
     } catch (error) {
-      console.error("Error updating product:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error updating product:", error)
+      }
       throw new Error("Failed to update product")
     }
   }
@@ -146,7 +153,9 @@ export class ProductsDB {
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
     } catch (error) {
-      console.error("Error deleting product:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error deleting product:", error)
+      }
       throw new Error("Failed to delete product")
     }
   }
@@ -162,7 +171,9 @@ export class ProductsDB {
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
       )
     } catch (error) {
-      console.error("Error searching products:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error searching products:", error)
+      }
       throw new Error("Failed to search products")
     }
   }
