@@ -12,7 +12,6 @@ export class ProductsDB {
    */
   static async getAll(): Promise<Product[]> {
     try {
-      console.log("[ProductsDB.getAll] Fetching all products...")
       const response = await fetch(API_BASE, {
         method: "GET",
         credentials: "include",
@@ -25,11 +24,11 @@ export class ProductsDB {
 
       const result = await response.json()
       const data = result.data || []
-      console.log("[ProductsDB.getAll] Fetched products count:", data.length)
       return data.map(dbProductToTS)
     } catch (error) {
-      console.error("[ProductsDB.getAll] Error fetching products:", {
-        error,
+      if (process.env.NODE_ENV === "development") {
+        console.error("[ProductsDB.getAll] Error fetching products:", {
+          error,
         errorType: error instanceof Error ? error.constructor.name : typeof error,
         errorMessage: error instanceof Error ? error.message : String(error),
       })
@@ -66,9 +65,7 @@ export class ProductsDB {
    */
   static async create(product: Omit<Product, "id" | "createdAt" | "updatedAt">): Promise<Product> {
     try {
-      console.log("[ProductsDB.create] Starting product creation:", product)
       const dbProduct = tsProductToDB(product)
-      console.log("[ProductsDB.create] Converted to DB format:", dbProduct)
 
       const response = await fetch(API_BASE, {
         method: "POST",
@@ -88,7 +85,6 @@ export class ProductsDB {
       }
 
       const result = await response.json()
-      console.log("[ProductsDB.create] Product created successfully:", result.data)
       return dbProductToTS(result.data)
     } catch (error) {
       console.error("[ProductsDB.create] Error creating product:", {

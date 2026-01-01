@@ -98,7 +98,6 @@ export class SalesDB {
    */
   static async create(sale: Omit<Sale, "id" | "createdAt">): Promise<Sale> {
     try {
-      console.log("[SalesDB.create] Starting sale creation:", sale)
       const dbSale = tsSaleToDB(sale)
 
       const response = await fetch(API_BASE, {
@@ -125,7 +124,6 @@ export class SalesDB {
 
       const result = await response.json()
       const data = Array.isArray(result.data) ? result.data[0] : result.data
-      console.log("[SalesDB.create] Sale created successfully")
       return dbSaleToTS(data)
     } catch (error) {
       console.error("[SalesDB.create] Error creating sale:", {

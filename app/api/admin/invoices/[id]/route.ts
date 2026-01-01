@@ -85,7 +85,6 @@ export async function PATCH(
     const body = await request.json()
     
     // Log the received data for debugging
-    console.log("[API /admin/invoices/[id]] Received update body:", JSON.stringify(body, null, 2))
     
     const validationResult = updateInvoiceSchema.safeParse(body)
     

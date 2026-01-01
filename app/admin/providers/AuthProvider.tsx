@@ -36,7 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(false)
       }
     } catch (error) {
-      console.error("[AuthProvider] Error checking auth:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("[AuthProvider] Error checking auth:", error)
+      }
       setIsAuthenticated(false)
     } finally {
       setIsLoading(false)
@@ -63,7 +65,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error || "خطا در ورود" }
       }
     } catch (error) {
-      console.error("[AuthProvider] Login error:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("[AuthProvider] Login error:", error)
+      }
       return { success: false, error: "خطا در ارتباط با سرور" }
     }
   }
@@ -77,7 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(false)
       router.push("/admin")
     } catch (error) {
-      console.error("[AuthProvider] Logout error:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("[AuthProvider] Logout error:", error)
+      }
     }
   }
 

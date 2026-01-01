@@ -25,13 +25,11 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
   // Fetch all data
   const fetchAll = useCallback(async () => {
     if (!isAuthenticated) {
-      console.log("[useSupabaseData] Not authenticated, skipping data fetch")
       setLoading(false)
       return
     }
 
     try {
-      console.log("[useSupabaseData] Starting to fetch all data...")
       setLoading(true)
       setError(null)
 
@@ -44,14 +42,6 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
           InvoicesDB.getAll(),
         ])
 
-      console.log("[useSupabaseData] Data fetched successfully:", {
-        products: productsData.length,
-        productions: productionsData.length,
-        costs: costsData.length,
-        sales: salesData.length,
-        invoices: invoicesData.length,
-      })
-
       setProducts(productsData)
       setProductions(productionsData)
       setCosts(costsData)
@@ -60,14 +50,12 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch data"
       setError(errorMessage)
-      console.error("[useSupabaseData] Error fetching data:", {
-        error: err,
-        errorMessage,
-        errorType: err instanceof Error ? err.constructor.name : typeof err,
-      })
+      // Only log errors in production for debugging
+      if (process.env.NODE_ENV === "development") {
+        console.error("[useSupabaseData] Error fetching data:", err)
+      }
     } finally {
       setLoading(false)
-      console.log("[useSupabaseData] Fetch completed, loading set to false")
     }
   }, [isAuthenticated])
 

@@ -96,7 +96,6 @@ export function tsCostToDB(cost: Omit<Cost, "id" | "createdAt">): Database["publ
     production_date: cost.productionDate || null,
   }
 
-  console.log("[tsCostToDB] Converting cost:", { cost, dbCost })
   return dbCost
 }
 

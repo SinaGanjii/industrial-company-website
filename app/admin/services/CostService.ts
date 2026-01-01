@@ -99,17 +99,8 @@ export class CostService {
   ): Cost[] {
     // Validate inputs
     if (!startDate || !endDate) {
-      console.warn("[CostService.collectCostsForPeriod] Invalid dates:", { startDate, endDate })
       return []
     }
-
-    console.log("[CostService.collectCostsForPeriod] Collecting costs for period:", { startDate, endDate })
-    console.log("[CostService.collectCostsForPeriod] Available costs:", allCosts.map(c => ({
-      id: c.id,
-      periodType: c.periodType,
-      periodValue: c.periodValue,
-      amount: c.amount
-    })))
 
     const includedCosts: Cost[] = []
     const daysInRange = this.calculateDaysInRange(startDate, endDate)
@@ -117,7 +108,6 @@ export class CostService {
     for (const cost of allCosts) {
       // Validate cost has required fields
       if (!cost.periodType || !cost.periodValue) {
-        console.warn("[CostService.collectCostsForPeriod] Invalid cost:", cost)
         continue
       }
 
@@ -129,15 +119,6 @@ export class CostService {
         const normalizedEnd = this.convertToWesternDigits(endDate)
         const isInRange = normalizedCostDate >= normalizedStart && normalizedCostDate <= normalizedEnd
         
-        console.log("[CostService.collectCostsForPeriod] Daily cost check:", {
-          costPeriodValue: cost.periodValue,
-          normalizedCostDate,
-          startDate,
-          normalizedStart,
-          endDate,
-          normalizedEnd,
-          isInRange
-        })
         if (isInRange) {
           includedCosts.push(cost)
         }
@@ -145,19 +126,12 @@ export class CostService {
         // Include monthly costs if month is in range
         const costMonth = cost.periodValue // Format: YYYY/MM
         const isInRange = this.isMonthInRange(costMonth, startDate, endDate)
-        console.log("[CostService.collectCostsForPeriod] Monthly cost check:", {
-          costPeriodValue: cost.periodValue,
-          startDate,
-          endDate,
-          isInRange
-        })
         if (isInRange) {
           includedCosts.push(cost)
         }
       }
     }
 
-    console.log("[CostService.collectCostsForPeriod] Found costs:", includedCosts.length, includedCosts)
     return includedCosts
   }
 
@@ -223,16 +197,7 @@ export class CostService {
       return []
     }
     
-    console.log("[CostService.getCostsForDay] Looking for costs for date:", date)
-    console.log("[CostService.getCostsForDay] Available costs:", allCosts.map(c => ({
-      id: c.id,
-      periodType: c.periodType,
-      periodValue: c.periodValue,
-      amount: c.amount
-    })))
-    
     const costs = this.collectCostsForPeriod(date, date, allCosts)
-    console.log("[CostService.getCostsForDay] Found costs:", costs.length, costs)
     return costs
   }
 
@@ -249,8 +214,6 @@ export class CostService {
     const normalizedMonth = month.length === 1 ? `0${month}` : month
     const monthValue = `${year}/${normalizedMonth}`
     
-    console.log("[CostService.getCostsForMonth] Looking for costs for:", { year, month, normalizedMonth, monthValue })
-    
     // Filter monthly costs directly by periodValue (exact match)
     const monthlyCosts = allCosts.filter((cost) => {
       if (cost.periodType !== "monthly") return false
@@ -266,15 +229,7 @@ export class CostService {
         const costMonth = costParts[1].length === 1 ? `0${costParts[1]}` : costParts[1]
         const normalizedCostValue = `${costYear}/${costMonth}`
         
-        const matches = normalizedCostValue === monthValue
-        console.log("[CostService.getCostsForMonth] Comparing cost:", { 
-          original: costPeriodValue,
-          normalized: normalizedCostValue,
-          target: monthValue,
-          matches
-        })
-        
-        return matches
+        return normalizedCostValue === monthValue
       }
       
       return false
@@ -288,13 +243,6 @@ export class CostService {
     // Combine monthly costs with daily and yearly costs (exclude monthly from dailyAndYearlyCosts to avoid duplicates)
     const dailyAndYearlyOnly = dailyAndYearlyCosts.filter(c => c.periodType !== "monthly")
     const allMonthCosts = [...monthlyCosts, ...dailyAndYearlyOnly]
-    
-    console.log("[CostService.getCostsForMonth] Found costs:", {
-      monthlyCosts: monthlyCosts.length,
-      dailyAndYearlyCosts: dailyAndYearlyOnly.length,
-      total: allMonthCosts.length,
-      monthlyCostsDetails: monthlyCosts.map(c => ({ id: c.id, periodValue: c.periodValue, amount: c.amount }))
-    })
     
     return allMonthCosts
   }

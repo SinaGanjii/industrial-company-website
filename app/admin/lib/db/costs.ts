@@ -12,7 +12,6 @@ export class CostsDB {
    */
   static async getAll(): Promise<Cost[]> {
     try {
-      console.log("[CostsDB.getAll] Fetching all costs...")
       const response = await fetch(API_BASE, {
         method: "GET",
         credentials: "include",
@@ -25,10 +24,11 @@ export class CostsDB {
 
       const result = await response.json()
       const data = result.data || []
-      console.log("[CostsDB.getAll] Fetched costs count:", data.length)
       return data.map(dbCostToTS)
     } catch (error) {
-      console.error("[CostsDB.getAll] Error fetching costs:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("[CostsDB.getAll] Error fetching costs:", error)
+      }
       throw new Error("Failed to fetch costs")
     }
   }
@@ -101,9 +101,7 @@ export class CostsDB {
    */
   static async create(cost: Omit<Cost, "id" | "createdAt">): Promise<Cost> {
     try {
-      console.log("[CostsDB.create] Starting cost creation:", cost)
       const dbCost = tsCostToDB(cost)
-      console.log("[CostsDB.create] Converted to DB format:", dbCost)
 
       const response = await fetch(API_BASE, {
         method: "POST",
@@ -129,7 +127,6 @@ export class CostsDB {
       }
 
       const result = await response.json()
-      console.log("[CostsDB.create] Cost created successfully:", result.data)
       return dbCostToTS(result.data)
     } catch (error) {
       console.error("[CostsDB.create] Error creating cost:", {

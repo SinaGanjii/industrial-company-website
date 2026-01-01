@@ -61,7 +61,9 @@ function validateCredentials(username: string, password: string): boolean {
       (user) => user.username === username && user.password === password
     )
   } catch (error) {
-    console.error("[API /auth/login] Error loading admin users:", error)
+    if (process.env.NODE_ENV === "development") {
+      console.error("[API /auth/login] Error loading admin users:", error)
+    }
     return false
   }
 }
@@ -111,7 +113,9 @@ export async function POST(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error("[API /auth/login] Error:", error)
+    if (process.env.NODE_ENV === "development") {
+      console.error("[API /auth/login] Error:", error)
+    }
     return NextResponse.json(
       { error: "خطا در پردازش درخواست" },
       { status: 500 }

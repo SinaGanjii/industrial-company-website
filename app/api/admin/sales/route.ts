@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Log the received data for debugging
-    console.log("[API /admin/sales] Received body:", JSON.stringify(body, null, 2))
     
     // Check if it's a single sale or array
     const isArray = Array.isArray(body)

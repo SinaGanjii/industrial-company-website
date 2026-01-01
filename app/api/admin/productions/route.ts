@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("[API /admin/productions] Supabase error:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("[API /admin/productions] Supabase error:", error)
+      }
       return NextResponse.json(
         { error: "Erreur lors de la récupération des productions" },
         { status: 500 }
@@ -30,7 +32,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: data || [] }, { status: 200 })
   } catch (error) {
-    console.error("[API /admin/productions] Error:", error)
+    if (process.env.NODE_ENV === "development") {
+      console.error("[API /admin/productions] Error:", error)
+    }
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }
@@ -58,14 +62,18 @@ export async function POST(request: NextRequest) {
       .from("productions")
       .insert({
         product_id: validationResult.data.productId,
+        product_name: validationResult.data.productName,
         quantity: validationResult.data.quantity,
         date: validationResult.data.date,
+        shift: validationResult.data.shift,
       })
       .select()
       .single()
 
     if (error) {
-      console.error("[API /admin/productions] Supabase error:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("[API /admin/productions] Supabase error:", error)
+      }
       return NextResponse.json(
         { error: "Erreur lors de la création de la production" },
         { status: 500 }
@@ -74,7 +82,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data }, { status: 201 })
   } catch (error) {
-    console.error("[API /admin/productions] Error:", error)
+    if (process.env.NODE_ENV === "development") {
+      console.error("[API /admin/productions] Error:", error)
+    }
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 })
   }
 }

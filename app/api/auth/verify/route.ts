@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    console.error("[API /auth/verify] Error:", error)
+    if (process.env.NODE_ENV === "development") {
+      console.error("[API /auth/verify] Error:", error)
+    }
     return NextResponse.json(
       { authenticated: false, error: "خطا در بررسی احراز هویت" },
       { status: 500 }

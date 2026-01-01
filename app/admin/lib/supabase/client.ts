@@ -16,31 +16,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-console.log("[Supabase Client] Initializing Supabase client:", {
-  url: supabaseUrl.substring(0, 30) + "...",
-  hasKey: !!supabaseAnonKey,
-  keyLength: supabaseAnonKey.length,
-})
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false, // We're using custom auth
   },
 })
-
-// Test connection on initialization
-supabase
-  .from("products")
-  .select("count")
-  .limit(1)
-  .then(({ error }) => {
-    if (error) {
-      console.error("[Supabase Client] Connection test failed:", error)
-    } else {
-      console.log("[Supabase Client] Connection test successful")
-    }
-  })
-  .catch((err) => {
-    console.error("[Supabase Client] Connection test error:", err)
-  })
 

@@ -11,7 +11,9 @@ async function getXLSX(): Promise<any> {
       // @ts-ignore
       xlsxModule = await import("xlsx")
     } catch (error) {
-      console.error("Failed to load xlsx:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Failed to load xlsx:", error)
+      }
       throw new Error("کتابخانه Excel بارگذاری نشد. لطفاً صفحه را رفرش کنید.")
     }
   }
@@ -192,6 +194,46 @@ function createPDFFromHTML(htmlContent: string, filename: string): void {
           page-break-before: always;
           margin-top: 30px;
         }
+        @media screen and (max-width: 768px) {
+          body {
+            font-size: 10px;
+            padding: 10px;
+          }
+          .header {
+            font-size: 18px;
+          }
+          .subheader {
+            font-size: 11px;
+          }
+          .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .kpi-card {
+            padding: 12px 10px;
+          }
+          .kpi-card .label {
+            font-size: 9px;
+          }
+          .kpi-card .value {
+            font-size: 14px;
+          }
+          table {
+            font-size: 9px;
+          }
+          th, td {
+            padding: 6px 4px;
+            font-size: 9px;
+          }
+          .info-row {
+            flex-direction: column;
+            gap: 4px;
+          }
+          .total {
+            font-size: 12px;
+            padding: 10px 15px;
+          }
+        }
         @media print {
           body {
             padding: 0;
@@ -282,10 +324,12 @@ export async function exportInvoiceToPDF(invoice: Invoice): Promise<void> {
     `
 
     createPDFFromHTML(htmlContent, `فاکتور-${invoice.invoiceNumber}`)
-  } catch (error) {
-    console.error("Error exporting invoice to PDF:", error)
-    alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error exporting invoice to PDF:", error)
+      }
+      alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
+    }
 }
 
 /**
@@ -319,10 +363,12 @@ export async function exportInvoiceToExcel(invoice: Invoice): Promise<void> {
     
     XLSX.utils.book_append_sheet(wb, ws, "فاکتور")
     XLSX.writeFile(wb, `فاکتور-${invoice.invoiceNumber}.xlsx`)
-  } catch (error) {
-    console.error("Error exporting invoice to Excel:", error)
-    alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error exporting invoice to Excel:", error)
+      }
+      alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
+    }
 }
 
 /**
@@ -411,10 +457,12 @@ export async function exportReportToExcel(
       XLSX.utils.book_append_sheet(wb, ws, "گزارش ماهانه")
       XLSX.writeFile(wb, `گزارش-ماهانه-${monthly.year}-${monthly.month}.xlsx`)
     }
-  } catch (error) {
-    console.error("Error exporting report to Excel:", error)
-    alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error exporting report to Excel:", error)
+      }
+      alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
+    }
 }
 
 // Helper functions
@@ -583,10 +631,12 @@ export async function exportDashboardToPDF(data: {
     `
 
     createPDFFromHTML(htmlContent, `گزارش-${data.startDate}-تا-${data.endDate}`)
-  } catch (error) {
-    console.error("Error exporting dashboard to PDF:", error)
-    alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error exporting dashboard to PDF:", error)
+      }
+      alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
+    }
 }
 
 /**
@@ -738,10 +788,12 @@ export async function exportDashboardToExcel(data: {
       bookType: "xlsx",
       type: "array",
     })
-  } catch (error) {
-    console.error("Error exporting to Excel:", error)
-    alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error exporting to Excel:", error)
+      }
+      alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
+    }
 }
 
 /**
@@ -834,10 +886,12 @@ export async function exportCostsToPDF(costs: Cost[]): Promise<void> {
     `
 
     createPDFFromHTML(htmlContent, "گزارش-هزینه‌ها")
-  } catch (error) {
-    console.error("Error exporting costs to PDF:", error)
-    alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
-  }
+    } catch (error) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error exporting costs to PDF:", error)
+      }
+      alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
+    }
 }
 
 /**

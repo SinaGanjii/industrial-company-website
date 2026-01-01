@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Log the received data for debugging
-    console.log("[API /admin/invoices] Received body:", JSON.stringify(body, null, 2))
     
     const validationResult = invoiceSchema.safeParse(body)
     

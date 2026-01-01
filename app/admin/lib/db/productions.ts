@@ -25,7 +25,9 @@ export class ProductionsDB {
       const result = await response.json()
       return (result.data || []).map(dbProductionToTS)
     } catch (error) {
-      console.error("Error fetching productions:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching productions:", error)
+      }
       throw new Error("Failed to fetch productions")
     }
   }
@@ -38,7 +40,9 @@ export class ProductionsDB {
       const allProductions = await this.getAll()
       return allProductions.filter((p) => p.productId === productId)
     } catch (error) {
-      console.error("Error fetching productions by product:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching productions by product:", error)
+      }
       throw new Error("Failed to fetch productions")
     }
   }
@@ -51,7 +55,9 @@ export class ProductionsDB {
       const allProductions = await this.getAll()
       return allProductions.filter((p) => p.date === date)
     } catch (error) {
-      console.error("Error fetching productions by date:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching productions by date:", error)
+      }
       throw new Error("Failed to fetch productions")
     }
   }
@@ -75,7 +81,9 @@ export class ProductionsDB {
       const result = await response.json()
       return result.data ? dbProductionToTS(result.data) : null
     } catch (error) {
-      console.error("Error fetching production:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching production:", error)
+      }
       throw new Error("Failed to fetch production")
     }
   }
@@ -85,7 +93,6 @@ export class ProductionsDB {
    */
   static async create(production: Omit<Production, "id" | "createdAt">): Promise<Production> {
     try {
-      console.log("[ProductionsDB.create] Starting production creation:", production)
       const dbProduction = tsProductionToDB(production)
 
       const response = await fetch(API_BASE, {
@@ -94,26 +101,31 @@ export class ProductionsDB {
         credentials: "include",
         body: JSON.stringify({
           productId: production.productId,
+          productName: production.productName,
           quantity: production.quantity,
           date: production.date,
+          shift: production.shift,
         }),
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        if (process.env.NODE_ENV === "development") {
         console.error("[ProductionsDB.create] API error:", errorData)
+      }
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
       const result = await response.json()
-      console.log("[ProductionsDB.create] Production created successfully")
       return dbProductionToTS(result.data)
     } catch (error) {
-      console.error("[ProductionsDB.create] Error creating production:", {
-        error,
-        production,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
+      if (process.env.NODE_ENV === "development") {
+        console.error("[ProductionsDB.create] Error creating production:", {
+          error,
+          production,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+      }
       throw new Error(`Failed to create production: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -133,7 +145,9 @@ export class ProductionsDB {
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
     } catch (error) {
-      console.error("Error deleting production:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error deleting production:", error)
+      }
       throw new Error("Failed to delete production")
     }
   }
@@ -146,7 +160,9 @@ export class ProductionsDB {
       const allProductions = await this.getAll()
       return allProductions.filter((p) => p.date >= startDate && p.date <= endDate)
     } catch (error) {
-      console.error("Error fetching productions by date range:", error)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error fetching productions by date range:", error)
+      }
       throw new Error("Failed to fetch productions")
     }
   }
