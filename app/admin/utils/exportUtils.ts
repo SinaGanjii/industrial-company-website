@@ -22,13 +22,566 @@ async function getXLSX(): Promise<any> {
 
 // Helper function to create and download PDF from HTML with professional A4 design
 function createPDFFromHTML(htmlContent: string, filename: string): void {
-  // Create a temporary container
-  const printWindow = window.open("", "_blank")
+  // Detect if we're on mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  
+  // For mobile, use iframe approach to avoid popup blockers
+  if (isMobile) {
+    // Create a hidden iframe
+    const iframe = document.createElement("iframe")
+    iframe.style.position = "fixed"
+    iframe.style.right = "-9999px"
+    iframe.style.width = "210mm"
+    iframe.style.height = "297mm"
+    iframe.style.border = "none"
+    document.body.appendChild(iframe)
+    
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!iframeDoc) {
+      alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
+      document.body.removeChild(iframe)
+      return
+    }
+    
+    iframeDoc.open()
+    iframeDoc.write(`
+    <!DOCTYPE html>
+    <html dir="rtl" lang="fa">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${filename}</title>
+      <style>
+        @page {
+          size: A4;
+          margin: 15mm 20mm;
+        }
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+          direction: rtl;
+          text-align: right;
+          font-size: 11px;
+          line-height: 1.7;
+          color: #1f2937;
+          background: #ffffff;
+          padding: 0;
+          width: 210mm;
+          min-height: 297mm;
+        }
+        .container {
+          max-width: 100%;
+          margin: 0 auto;
+          padding: 0;
+        }
+        .header {
+          font-size: 24px;
+          font-weight: 700;
+          margin-bottom: 25px;
+          text-align: center;
+          color: #1e40af;
+          border-bottom: 3px solid #1e40af;
+          padding-bottom: 15px;
+          letter-spacing: 0.5px;
+        }
+        .subheader {
+          font-size: 13px;
+          font-weight: 600;
+          margin: 15px 0 10px 0;
+          color: #374151;
+          padding: 8px 0;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .info-row {
+          display: flex;
+          justify-content: space-between;
+          margin: 12px 0;
+          padding: 8px 12px;
+          background: #f9fafb;
+          border-radius: 4px;
+          font-size: 11px;
+        }
+        .info-row span {
+          font-weight: 500;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+          direction: rtl;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          border-radius: 6px;
+          overflow: hidden;
+        }
+        th {
+          background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+          color: white;
+          padding: 12px 10px;
+          text-align: right;
+          font-weight: 600;
+          font-size: 11px;
+          border: none;
+          letter-spacing: 0.3px;
+        }
+        td {
+          padding: 10px;
+          border-bottom: 1px solid #e5e7eb;
+          text-align: right;
+          font-size: 10.5px;
+        }
+        tbody tr {
+          transition: background-color 0.2s;
+        }
+        tbody tr:nth-child(even) {
+          background-color: #f9fafb;
+        }
+        tbody tr:hover {
+          background-color: #f3f4f6;
+        }
+        tbody tr:last-child td {
+          border-bottom: none;
+        }
+        .total {
+          font-size: 16px;
+          font-weight: 700;
+          margin-top: 25px;
+          padding: 15px 20px;
+          background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+          color: white;
+          text-align: left;
+          border-radius: 6px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .notes {
+          margin-top: 20px;
+          padding: 12px 15px;
+          background: #fef3c7;
+          border-right: 4px solid #f59e0b;
+          border-radius: 4px;
+          font-style: italic;
+          color: #92400e;
+          font-size: 10.5px;
+        }
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 12px;
+          margin: 20px 0;
+        }
+        .kpi-card {
+          background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+          padding: 18px 15px;
+          border-radius: 8px;
+          text-align: center;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .kpi-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .kpi-card .label {
+          font-weight: 600;
+          font-size: 11px;
+          color: #64748b;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .kpi-card .value {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1e293b;
+          margin-top: 5px;
+        }
+        .kpi-card.profit-positive .value {
+          color: #059669;
+        }
+        .kpi-card.profit-negative .value {
+          color: #dc2626;
+        }
+        .page-break {
+          page-break-before: always;
+          margin-top: 30px;
+        }
+        @media screen and (max-width: 768px) {
+          body {
+            font-size: 10px;
+            padding: 10px;
+          }
+          .header {
+            font-size: 18px;
+          }
+          .subheader {
+            font-size: 11px;
+          }
+          .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .kpi-card {
+            padding: 12px 10px;
+          }
+          .kpi-card .label {
+            font-size: 9px;
+          }
+          .kpi-card .value {
+            font-size: 14px;
+          }
+          table {
+            font-size: 9px;
+          }
+          th, td {
+            padding: 6px 4px;
+            font-size: 9px;
+          }
+          .info-row {
+            flex-direction: column;
+            gap: 4px;
+          }
+          .total {
+            font-size: 12px;
+            padding: 10px 15px;
+          }
+        }
+        @media print {
+          body {
+            padding: 0;
+            width: 210mm;
+            min-height: 297mm;
+          }
+          .page-break {
+            page-break-before: always;
+          }
+          .kpi-card {
+            page-break-inside: avoid;
+          }
+          table {
+            page-break-inside: auto;
+          }
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tfoot {
+            display: table-footer-group;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        ${htmlContent}
+      </div>
+    </body>
+    </html>
+    `)
+    
+    iframeDoc.close()
+    
+    // Wait for content to load, then print
+    setTimeout(() => {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.print()
+        // Clean up after printing
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            document.body.removeChild(iframe)
+          }
+        }, 1000)
+      }
+    }, 500)
+    return
+  }
+  
+  // For desktop, try window.open first, fallback to iframe if blocked
+  let printWindow = window.open("", "_blank")
+  
   if (!printWindow) {
-    alert("لطفاً popup blocker را غیرفعال کنید")
+    // Fallback to iframe if popup is blocked
+    const iframe = document.createElement("iframe")
+    iframe.style.position = "fixed"
+    iframe.style.right = "-9999px"
+    iframe.style.width = "210mm"
+    iframe.style.height = "297mm"
+    iframe.style.border = "none"
+    document.body.appendChild(iframe)
+    
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!iframeDoc) {
+      alert("خطا در ایجاد فایل PDF. لطفاً popup blocker را غیرفعال کنید.")
+      if (iframe.parentNode) {
+        document.body.removeChild(iframe)
+      }
+      return
+    }
+    
+    iframeDoc.open()
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="fa">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${filename}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 15mm 20mm;
+          }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+            direction: rtl;
+            text-align: right;
+            font-size: 11px;
+            line-height: 1.7;
+            color: #1f2937;
+            background: #ffffff;
+            padding: 0;
+            width: 210mm;
+            min-height: 297mm;
+          }
+          .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0;
+          }
+          .header {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            text-align: center;
+            color: #1e40af;
+            border-bottom: 3px solid #1e40af;
+            padding-bottom: 15px;
+            letter-spacing: 0.5px;
+          }
+          .subheader {
+            font-size: 13px;
+            font-weight: 600;
+            margin: 15px 0 10px 0;
+            color: #374151;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            padding: 8px 12px;
+            background: #f9fafb;
+            border-radius: 4px;
+            font-size: 11px;
+          }
+          .info-row span {
+            font-weight: 500;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            direction: rtl;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+          }
+          th {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 12px 10px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 11px;
+            border: none;
+            letter-spacing: 0.3px;
+          }
+          td {
+            padding: 10px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: right;
+            font-size: 10.5px;
+          }
+          tbody tr {
+            transition: background-color 0.2s;
+          }
+          tbody tr:nth-child(even) {
+            background-color: #f9fafb;
+          }
+          tbody tr:hover {
+            background-color: #f3f4f6;
+          }
+          tbody tr:last-child td {
+            border-bottom: none;
+          }
+          .total {
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 25px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            text-align: left;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          }
+          .notes {
+            margin-top: 20px;
+            padding: 12px 15px;
+            background: #fef3c7;
+            border-right: 4px solid #f59e0b;
+            border-radius: 4px;
+            font-style: italic;
+            color: #92400e;
+            font-size: 10.5px;
+          }
+          .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 20px 0;
+          }
+          .kpi-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            padding: 18px 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+          }
+          .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          }
+          .kpi-card .label {
+            font-weight: 600;
+            font-size: 11px;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .kpi-card .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-top: 5px;
+          }
+          .kpi-card.profit-positive .value {
+            color: #059669;
+          }
+          .kpi-card.profit-negative .value {
+            color: #dc2626;
+          }
+          .page-break {
+            page-break-before: always;
+            margin-top: 30px;
+          }
+          @media screen and (max-width: 768px) {
+            body {
+              font-size: 10px;
+              padding: 10px;
+            }
+            .header {
+              font-size: 18px;
+            }
+            .subheader {
+              font-size: 11px;
+            }
+            .kpi-grid {
+              grid-template-columns: repeat(2, 1fr);
+              gap: 8px;
+            }
+            .kpi-card {
+              padding: 12px 10px;
+            }
+            .kpi-card .label {
+              font-size: 9px;
+            }
+            .kpi-card .value {
+              font-size: 14px;
+            }
+            table {
+              font-size: 9px;
+            }
+            th, td {
+              padding: 6px 4px;
+              font-size: 9px;
+            }
+            .info-row {
+              flex-direction: column;
+              gap: 4px;
+            }
+            .total {
+              font-size: 12px;
+              padding: 10px 15px;
+            }
+          }
+          @media print {
+            body {
+              padding: 0;
+              width: 210mm;
+              min-height: 297mm;
+            }
+            .page-break {
+              page-break-before: always;
+            }
+            .kpi-card {
+              page-break-inside: avoid;
+            }
+            table {
+              page-break-inside: auto;
+            }
+            tr {
+              page-break-inside: avoid;
+              page-break-after: auto;
+            }
+            thead {
+              display: table-header-group;
+            }
+            tfoot {
+              display: table-footer-group;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          ${htmlContent}
+        </div>
+      </body>
+      </html>
+    `)
+    
+    iframeDoc.close()
+    
+    setTimeout(() => {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.print()
+        setTimeout(() => {
+          if (iframe.parentNode) {
+            document.body.removeChild(iframe)
+          }
+        }, 1000)
+      }
+    }, 500)
     return
   }
 
+  // Desktop: use window.open
   printWindow.document.write(`
     <!DOCTYPE html>
     <html dir="rtl" lang="fa">
