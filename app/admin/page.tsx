@@ -258,19 +258,20 @@ function AdminContent() {
     <div className="min-h-screen bg-background" dir="rtl">
       {/* Admin Header */}
       <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4 py-3 md:py-4">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Building2 className="h-8 w-8 text-accent" />
-              <span className="text-xl font-bold text-foreground">پنل مدیریت</span>
+              <Building2 className="h-6 w-6 md:h-8 md:w-8 text-accent flex-shrink-0" />
+              <span className="text-base md:text-xl font-bold text-foreground whitespace-nowrap">پنل مدیریت</span>
             </div>
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" asChild>
+            <div className="flex items-center gap-2 md:gap-4">
+              <Button variant="outline" size="sm" asChild className="text-xs md:text-sm px-2 md:px-3">
                 <a href="/" target="_blank" rel="noreferrer">
-                  مشاهده سایت
+                  <span className="hidden sm:inline">مشاهده سایت</span>
+                  <span className="sm:hidden">سایت</span>
                 </a>
               </Button>
-              <Button variant="ghost" size="sm" onClick={logout}>
+              <Button variant="ghost" size="sm" onClick={logout} className="text-xs md:text-sm px-2 md:px-3">
                 خروج
               </Button>
             </div>
@@ -281,28 +282,30 @@ function AdminContent() {
       {/* Admin Content */}
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue="dashboard" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 h-auto">
-            <TabsTrigger value="dashboard" className="gap-2 py-3">
-              <BarChart3 className="h-4 w-4" />
-              داشبورد
-            </TabsTrigger>
-            <TabsTrigger value="production" className="gap-2 py-3">
-              <Factory className="h-4 w-4" />
-              تولید
-            </TabsTrigger>
-            <TabsTrigger value="sales-invoices" className="gap-2 py-3">
-              <FileText className="h-4 w-4" />
-              فاکتورها
-            </TabsTrigger>
-            <TabsTrigger value="costs" className="gap-2 py-3">
-              <DollarSign className="h-4 w-4" />
-              هزینه‌ها
-            </TabsTrigger>
-            <TabsTrigger value="products" className="gap-2 py-3">
-              <Package className="h-4 w-4" />
-              محصولات
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <TabsList className="inline-flex w-full min-w-max md:grid md:grid-cols-5 h-auto gap-1 md:gap-0">
+              <TabsTrigger value="dashboard" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
+                <BarChart3 className="h-3 w-3 md:h-4 md:w-4" />
+                <span>داشبورد</span>
+              </TabsTrigger>
+              <TabsTrigger value="production" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
+                <Factory className="h-3 w-3 md:h-4 md:w-4" />
+                <span>تولید</span>
+              </TabsTrigger>
+              <TabsTrigger value="sales-invoices" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
+                <FileText className="h-3 w-3 md:h-4 md:w-4" />
+                <span>فاکتورها</span>
+              </TabsTrigger>
+              <TabsTrigger value="costs" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
+                <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
+                <span>هزینه‌ها</span>
+              </TabsTrigger>
+              <TabsTrigger value="products" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
+                <Package className="h-3 w-3 md:h-4 md:w-4" />
+                <span>محصولات</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-4">
