@@ -96,6 +96,8 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
 
   // Current stock (GLOBAL - all time, from paid invoices only)
   const stocks = StockService.calculateAllStocks(products, productions, invoices)
+    .filter((stock) => stock.totalProduction > 0) // Only show products with production
+    .sort((a, b) => b.remainingStock - a.remainingStock) // Sort by stock descending
   const totalStock = stocks.reduce((sum, s) => sum + s.remainingStock, 0)
 
   // Latest items in range (for activity tables)
@@ -288,14 +290,20 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
               {formatPersianNumber(totalStock)} عدد
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {stocks.slice(0, 4).map((stock) => (
-              <div key={stock.productId} className="p-3 bg-muted/50 rounded-lg">
-                <div className="text-sm font-medium text-foreground mb-1">{stock.productName}</div>
-                <div className="text-lg font-bold text-accent">{formatPersianNumber(stock.remainingStock)}</div>
-                <div className="text-xs text-muted-foreground">عدد</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {stocks.length === 0 ? (
+              <div className="col-span-full text-center text-sm text-muted-foreground py-4">
+                هیچ محصولی با تولید یافت نشد
               </div>
-            ))}
+            ) : (
+              stocks.map((stock) => (
+                <div key={stock.productId} className="p-3 bg-muted/50 rounded-lg">
+                  <div className="text-sm font-medium text-foreground mb-1 line-clamp-2">{stock.productName}</div>
+                  <div className="text-lg font-bold text-accent">{formatPersianNumber(stock.remainingStock)}</div>
+                  <div className="text-xs text-muted-foreground">عدد</div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
