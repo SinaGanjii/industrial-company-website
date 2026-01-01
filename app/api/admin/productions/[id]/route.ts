@@ -7,7 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server"
 // GET - Get production by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const isAuthenticated = await verifyAdminSession(request)
@@ -15,11 +15,12 @@ export async function GET(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
+    const { id } = await params
     const supabase = createAdminSupabaseClient()
     const { data, error } = await supabase
       .from("productions")
       .select("*")
-      .eq("id", params.id)
+      .eq("id", id)
       .single()
 
     if (error) {
@@ -42,7 +43,7 @@ export async function GET(
 // DELETE - Delete production
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const isAuthenticated = await verifyAdminSession(request)
@@ -50,11 +51,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
     }
 
+    const { id } = await params
     const supabase = createAdminSupabaseClient()
     const { error } = await supabase
       .from("productions")
       .delete()
-      .eq("id", params.id)
+      .eq("id", id)
 
     if (error) {
       return NextResponse.json(
