@@ -151,11 +151,20 @@ export class CostsDB {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        if (process.env.NODE_ENV === "development") {
+          console.error("[CostsDB.delete] API error:", {
+            status: response.status,
+            statusText: response.statusText,
+            errorData,
+          })
+        }
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
     } catch (error) {
-      console.error("Error deleting cost:", error)
-      throw new Error("Failed to delete cost")
+      if (process.env.NODE_ENV === "development") {
+        console.error("[CostsDB.delete] Error deleting cost:", error)
+      }
+      throw new Error(`Failed to delete cost: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
