@@ -1,16 +1,19 @@
 // Date Utility Functions
 
 /**
- * Get today's date in Persian format
+ * Get today's date in Persian format (with Western digits for database compatibility)
  */
 export function getTodayPersianDate(): string {
   const today = new Date()
-  return new Intl.DateTimeFormat("fa-IR", {
+  const persianDate = new Intl.DateTimeFormat("fa-IR", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     calendar: "persian",
   }).format(today)
+  
+  // Convert Persian digits to Western digits for database compatibility
+  return convertToWesternDigits(persianDate)
 }
 
 /**

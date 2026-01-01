@@ -11,12 +11,28 @@ export const productSchema = z.object({
   unitPrice: z.number().min(0, "قیمت باید مثبت باشد").max(999999999999, "قیمت خیلی بزرگ است"),
 })
 
+// Helper function to convert Persian/Arabic digits to Western digits
+function convertToWesternDigits(str: string): string {
+  const persianDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
+  const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+  const westernDigits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+  
+  let result = str
+  for (let i = 0; i < 10; i++) {
+    result = result.replace(new RegExp(persianDigits[i], "g"), westernDigits[i])
+    result = result.replace(new RegExp(arabicDigits[i], "g"), westernDigits[i])
+  }
+  return result
+}
+
 // Schema pour Production
 export const productionSchema = z.object({
   productId: z.string().uuid("شناسه محصول نامعتبر است"),
   productName: z.string().min(1, "نام محصول الزامی است"),
   quantity: z.number().int("تعداد باید عدد صحیح باشد").min(1, "تعداد باید حداقل 1 باشد"),
-  date: z.string().regex(/^\d{4}\/\d{2}\/\d{2}$/, "فرمت تاریخ باید YYYY/MM/DD باشد"),
+  date: z.string()
+    .transform((val) => convertToWesternDigits(val)) // Convert Persian/Arabic digits to Western
+    .pipe(z.string().regex(/^\d{4}\/\d{2}\/\d{2}$/, "فرمت تاریخ باید YYYY/MM/DD باشد")),
   shift: z.enum(["صبح", "عصر", "شب"], {
     errorMap: () => ({ message: "شیفت باید یکی از: صبح، عصر، شب باشد" }),
   }),

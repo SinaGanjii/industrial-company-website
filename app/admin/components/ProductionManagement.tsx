@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, X } from "lucide-react"
 import type { Product, Production } from "../types"
-import { getTodayPersianDate, formatPersianNumber } from "../utils"
+import { getTodayPersianDate, formatPersianNumber, convertToWesternDigits } from "../utils"
 
 interface ProductionManagementProps {
   products: Product[]
@@ -39,11 +39,14 @@ export function ProductionManagement({
       return
     }
 
+    // Convert Persian/Arabic digits to Western digits for the date
+    const normalizedDate = convertToWesternDigits(formData.date)
+
     onAdd({
       productId: formData.productId,
       productName: selectedProduct?.name || "",
       quantity: Number.parseInt(formData.quantity),
-      date: formData.date,
+      date: normalizedDate,
       shift: formData.shift,
     })
 

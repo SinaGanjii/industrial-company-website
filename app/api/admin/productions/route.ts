@@ -51,8 +51,20 @@ export async function POST(request: NextRequest) {
     const validationResult = productionSchema.safeParse(body)
     
     if (!validationResult.success) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[API /admin/productions] Validation error:", {
+          body,
+          errors: validationResult.error.errors,
+        })
+      }
       return NextResponse.json(
-        { error: "Données invalides", details: validationResult.error.errors },
+        { 
+          error: "Données invalides", 
+          details: validationResult.error.errors.map(err => ({
+            path: err.path.join("."),
+            message: err.message,
+          })),
+        },
         { status: 400 }
       )
     }
