@@ -1,9 +1,10 @@
 // Costs Database Service
-// CRUD operations for costs table
+// CRUD operations for costs table - Uses secure API routes
 
-import { supabase } from "../supabase/client"
 import type { Cost } from "../../types"
 import { dbCostToTS, tsCostToDB } from "./utils"
+
+const API_BASE = "/api/admin/costs"
 
 export class CostsDB {
   /**
@@ -11,17 +12,23 @@ export class CostsDB {
    */
   static async getAll(): Promise<Cost[]> {
     try {
-      const { data, error } = await supabase
-        .from("costs")
-        .select("*")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
+      console.log("[CostsDB.getAll] Fetching all costs...")
+      const response = await fetch(API_BASE, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
 
-      return (data || []).map(dbCostToTS)
+      const result = await response.json()
+      const data = result.data || []
+      console.log("[CostsDB.getAll] Fetched costs count:", data.length)
+      return data.map(dbCostToTS)
     } catch (error) {
-      console.error("Error fetching costs:", error)
+      console.error("[CostsDB.getAll] Error fetching costs:", error)
       throw new Error("Failed to fetch costs")
     }
   }
@@ -31,15 +38,8 @@ export class CostsDB {
    */
   static async getByType(type: Cost["type"]): Promise<Cost[]> {
     try {
-      const { data, error } = await supabase
-        .from("costs")
-        .select("*")
-        .eq("type", type)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbCostToTS)
+      const allCosts = await this.getAll()
+      return allCosts.filter((c) => c.type === type)
     } catch (error) {
       console.error("Error fetching costs by type:", error)
       throw new Error("Failed to fetch costs")
@@ -51,15 +51,8 @@ export class CostsDB {
    */
   static async getByDate(date: string): Promise<Cost[]> {
     try {
-      const { data, error } = await supabase
-        .from("costs")
-        .select("*")
-        .eq("date", date)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbCostToTS)
+      const allCosts = await this.getAll()
+      return allCosts.filter((c) => c.date === date || c.periodValue === date)
     } catch (error) {
       console.error("Error fetching costs by date:", error)
       throw new Error("Failed to fetch costs")
@@ -71,15 +64,8 @@ export class CostsDB {
    */
   static async getByProductId(productId: string): Promise<Cost[]> {
     try {
-      const { data, error } = await supabase
-        .from("costs")
-        .select("*")
-        .eq("product_id", productId)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbCostToTS)
+      const allCosts = await this.getAll()
+      return allCosts.filter((c) => c.productId === productId)
     } catch (error) {
       console.error("Error fetching costs by product:", error)
       throw new Error("Failed to fetch costs")
@@ -91,18 +77,19 @@ export class CostsDB {
    */
   static async getById(id: string): Promise<Cost | null> {
     try {
-      const { data, error } = await supabase
-        .from("costs")
-        .select("*")
-        .eq("id", id)
-        .single()
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) {
-        if (error.code === "PGRST116") return null // Not found
-        throw error
+      if (response.status === 404) return null
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      return data ? dbCostToTS(data) : null
+      const result = await response.json()
+      return result.data ? dbCostToTS(result.data) : null
     } catch (error) {
       console.error("Error fetching cost:", error)
       throw new Error("Failed to fetch cost")
@@ -118,26 +105,32 @@ export class CostsDB {
       const dbCost = tsCostToDB(cost)
       console.log("[CostsDB.create] Converted to DB format:", dbCost)
 
-      const { data, error } = await supabase
-        .from("costs")
-        .insert(dbCost)
-        .select()
-        .single()
+      const response = await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: cost.type,
+          typeLabel: cost.typeLabel,
+          amount: cost.amount,
+          date: cost.date || cost.periodValue,
+          description: cost.description,
+          productId: cost.productId,
+          productionDate: cost.productionDate,
+          periodType: cost.periodType,
+          periodValue: cost.periodValue,
+        }),
+      })
 
-      if (error) {
-        console.error("[CostsDB.create] Supabase error:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          fullError: error,
-        })
-        console.error("[CostsDB.create] Data that was sent:", JSON.stringify(dbCost, null, 2))
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[CostsDB.create] API error:", errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      console.log("[CostsDB.create] Cost created successfully:", data)
-      return dbCostToTS(data)
+      const result = await response.json()
+      console.log("[CostsDB.create] Cost created successfully:", result.data)
+      return dbCostToTS(result.data)
     } catch (error) {
       console.error("[CostsDB.create] Error creating cost:", {
         error,
@@ -154,9 +147,15 @@ export class CostsDB {
    */
   static async delete(id: string): Promise<void> {
     try {
-      const { error } = await supabase.from("costs").delete().eq("id", id)
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
     } catch (error) {
       console.error("Error deleting cost:", error)
       throw new Error("Failed to delete cost")
@@ -168,16 +167,11 @@ export class CostsDB {
    */
   static async getByDateRange(startDate: string, endDate: string): Promise<Cost[]> {
     try {
-      const { data, error } = await supabase
-        .from("costs")
-        .select("*")
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbCostToTS)
+      const allCosts = await this.getAll()
+      return allCosts.filter((c) => {
+        const costDate = c.date || c.periodValue
+        return costDate >= startDate && costDate <= endDate
+      })
     } catch (error) {
       console.error("Error fetching costs by date range:", error)
       throw new Error("Failed to fetch costs")

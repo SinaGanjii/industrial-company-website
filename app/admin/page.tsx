@@ -31,7 +31,6 @@ import { Dashboard } from "./components/Dashboard"
 import { ProductManagement } from "./components/ProductManagement"
 import { ProductionManagement } from "./components/ProductionManagement"
 import { CostManagement } from "./components/CostManagement"
-import { SalesManagement } from "./components/SalesManagement"
 import { InvoiceManagement } from "./components/InvoiceManagement"
 import { getTodayPersianDate } from "./utils"
 import { AuthProvider, useAuth } from "./providers/AuthProvider"
@@ -59,9 +58,7 @@ function AdminContent() {
     deleteProduction,
     addCost,
     deleteCost,
-    addSale,
     addSales,
-    deleteSale,
     addInvoice,
     updateInvoice,
     deleteInvoice,
@@ -124,21 +121,6 @@ function AdminContent() {
     }
   }
 
-  const handleAddSale = async (saleData: Omit<Sale, "id" | "createdAt">) => {
-    try {
-      await addSale(saleData)
-    } catch (error) {
-      alert("خطا در ثبت فروش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
-    }
-  }
-
-  const handleDeleteSale = async (id: string) => {
-    try {
-      await deleteSale(id)
-    } catch (error) {
-      alert("خطا در حذف فروش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
-    }
-  }
 
   const handleAddInvoice = async (invoice: Invoice) => {
     try {
@@ -309,8 +291,8 @@ function AdminContent() {
               تولید
             </TabsTrigger>
             <TabsTrigger value="sales-invoices" className="gap-2 py-3">
-              <ShoppingCart className="h-4 w-4" />
-              فروشات / فاکتورها
+              <FileText className="h-4 w-4" />
+              فاکتورها
             </TabsTrigger>
             <TabsTrigger value="costs" className="gap-2 py-3">
               <DollarSign className="h-4 w-4" />
@@ -324,7 +306,7 @@ function AdminContent() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-4">
-            <Dashboard products={products} productions={productions} sales={sales} costs={costs} />
+            <Dashboard products={products} productions={productions} invoices={invoices} costs={costs} />
           </TabsContent>
 
           {/* Products Tab */}
@@ -352,45 +334,31 @@ function AdminContent() {
             <CostManagement
               products={products}
               costs={costs}
+              invoices={invoices}
               onAdd={handleAddCost}
               onDelete={handleDeleteCost}
             />
           </TabsContent>
 
-          {/* Sales / Invoices Tab */}
+          {/* Invoices Tab */}
           <TabsContent value="sales-invoices" className="space-y-4">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold mb-4">فاکتورها</h2>
-                <InvoiceManagement
-                  products={products}
-                  productions={productions}
-                  invoices={invoices}
-                  sales={sales}
-                  onAdd={handleAddInvoice}
-                  onUpdate={handleUpdateInvoice}
-                  onDelete={handleDeleteInvoice}
-                  onAddSales={async (newSales) => {
-                    // Add multiple sales at once
-                    try {
-                      await addSales(newSales)
-                    } catch (error) {
-                      alert("خطا در ثبت فروشات: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
-                    }
-                  }}
-                />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold mb-4">فروشات مستقیم</h2>
-                <SalesManagement
-                  products={products}
-                  productions={productions}
-                  sales={sales}
-                  onAdd={handleAddSale}
-                  onDelete={handleDeleteSale}
-                />
-              </div>
-            </div>
+            <InvoiceManagement
+              products={products}
+              productions={productions}
+              invoices={invoices}
+              sales={sales}
+              onAdd={handleAddInvoice}
+              onUpdate={handleUpdateInvoice}
+              onDelete={handleDeleteInvoice}
+              onAddSales={async (newSales) => {
+                // Add multiple sales at once (only from invoices)
+                try {
+                  await addSales(newSales)
+                } catch (error) {
+                  alert("خطا در ثبت فروشات: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+            />
           </TabsContent>
         </Tabs>
       </div>

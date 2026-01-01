@@ -1,23 +1,30 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-// Middleware pour protéger les routes /admin
+// Middleware pour protéger les routes /admin et /api/admin
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Protéger toutes les routes /admin (sauf la page de login elle-même)
   if (pathname.startsWith("/admin") && pathname !== "/admin") {
-    // Vérifier le cookie de session
     const sessionToken = request.cookies.get("admin_session")?.value
 
     if (!sessionToken) {
-      // Rediriger vers la page de login si pas de session
       const loginUrl = new URL("/admin", request.url)
       return NextResponse.redirect(loginUrl)
     }
+  }
 
-    // Vérifier que le token est valide (optionnel: vérifier avec Supabase)
-    // Pour l'instant, on vérifie juste l'existence du cookie
+  // Protéger toutes les routes API /api/admin (sauf /api/auth/*)
+  if (pathname.startsWith("/api/admin")) {
+    const sessionToken = request.cookies.get("admin_session")?.value
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { error: "Non autorisé" },
+        { status: 401 }
+      )
+    }
   }
 
   return NextResponse.next()

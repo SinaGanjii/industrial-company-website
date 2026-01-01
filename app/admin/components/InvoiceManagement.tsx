@@ -10,7 +10,7 @@ import { Plus, X, Check, FileText, Download } from "lucide-react"
 import type { Product, Invoice, InvoiceItem, Sale, Production } from "../types"
 import { InvoiceService } from "../services/InvoiceService"
 import { StockService } from "../services/StockService"
-import { exportInvoiceToPDF, exportInvoiceToExcel } from "../utils/exportUtils"
+import { exportInvoiceToPDF } from "../utils/exportUtils"
 import { getTodayPersianDate, formatPersianNumber } from "../utils"
 
 interface InvoiceManagementProps {
@@ -52,7 +52,7 @@ export function InvoiceManagement({
     if (!product) return
 
     // Calculate available stock (considering items already in the invoice)
-    const currentStock = StockService.getProductStock(selectedProduct, productions, sales)
+    const currentStock = StockService.getProductStock(selectedProduct, productions, invoices)
     const quantityInInvoice = formData.items
       .filter((item) => item.productId === selectedProduct)
       .reduce((sum, item) => sum + item.quantity, 0)
@@ -125,20 +125,95 @@ export function InvoiceManagement({
     onUpdate(invoice.id, approved)
   }
 
-  const handleMarkPaid = (invoice: Invoice) => {
+  const handleMarkPaid = async (invoice: Invoice) => {
     // Check if sales already exist for this invoice
     const existingSales = sales.filter((s) => s.invoiceId === invoice.id)
     
+    // Validate invoice has items
+    if (!invoice.items || invoice.items.length === 0) {
+      alert("خطا: فاکتور آیتمی ندارد")
+      return
+    }
+    
+    // Validate all items have required fields
+    const invalidItems = invoice.items
+      .map((item, index) => {
+        const missingFields: string[] = []
+        if (!item.productId) missingFields.push("productId")
+        if (!item.productName) missingFields.push("productName")
+        if (item.unitPrice === null || item.unitPrice === undefined || isNaN(Number(item.unitPrice))) {
+          missingFields.push("unitPrice")
+        }
+        if (!item.quantity || item.quantity <= 0) missingFields.push("quantity")
+        if (item.total === null || item.total === undefined || isNaN(Number(item.total))) {
+          missingFields.push("total")
+        }
+        
+        return missingFields.length > 0 ? { index, missingFields } : null
+      })
+      .filter((result): result is { index: number; missingFields: string[] } => result !== null)
+    
+    if (invalidItems.length > 0) {
+      alert(
+        `خطا: برخی از آیتم‌های فاکتور اطلاعات ناقص دارند:\n${invalidItems
+          .map(({ index, missingFields }) => `آیتم ${index + 1}: ${missingFields.join(", ")}`)
+          .join("\n")}`
+      )
+      return
+    }
+    
     // Mark invoice as paid first to get the paidDate
     const paid = InvoiceService.markAsPaid(invoice)
-    onUpdate(invoice.id, paid)
     
-    // Create sales entries from invoice items if they don't exist yet
-    if (existingSales.length === 0 && onAddSales) {
-      // Use InvoiceService to convert invoice to sales
-      const newSales = InvoiceService.invoiceToSales(paid)
-      // Add all sales at once
-      onAddSales(newSales)
+    // Ensure paid invoice has all items
+    if (!paid.items || paid.items.length === 0) {
+      paid.items = invoice.items
+    }
+    
+    // Update invoice in database
+    try {
+      let updatedInvoice: Invoice | undefined
+      try {
+        updatedInvoice = await onUpdate(invoice.id, paid)
+      } catch (updateError) {
+        // If update fails, use paid invoice with original items
+        updatedInvoice = { ...paid, items: invoice.items }
+      }
+      
+      // Use updated invoice if it has items, otherwise use paid invoice with original items
+      const invoiceToUse = (updatedInvoice?.items && updatedInvoice.items.length > 0) 
+        ? updatedInvoice 
+        : { ...paid, items: invoice.items }
+      
+      // Create sales entries from invoice items if they don't exist yet
+      if (existingSales.length === 0 && onAddSales) {
+        const newSales = InvoiceService.invoiceToSales(invoiceToUse)
+        
+        // Validate sales before sending
+        const validSales = newSales.filter(sale => 
+          sale.invoiceId && 
+          sale.customerName && 
+          sale.productId && 
+          sale.productName && 
+          sale.unitPrice !== null && 
+          sale.unitPrice !== undefined &&
+          sale.quantity > 0 &&
+          sale.totalPrice > 0
+        )
+        
+        if (validSales.length === 0) {
+          alert("خطا: هیچ فروش معتبری برای ایجاد وجود ندارد")
+          return
+        }
+        
+        try {
+          await onAddSales(validSales)
+        } catch (salesError) {
+          alert("خطا در ایجاد فروشات: " + (salesError instanceof Error ? salesError.message : "خطای ناشناخته"))
+        }
+      }
+    } catch (error) {
+      alert("خطا در پردازش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
     }
   }
 
@@ -221,7 +296,7 @@ export function InvoiceManagement({
                     </SelectTrigger>
                     <SelectContent>
                       {products.map((product) => {
-                        const stock = StockService.getProductStock(product.id, productions, sales)
+                        const stock = StockService.getProductStock(product.id, productions, invoices)
                         const quantityInInvoice = formData.items
                           .filter((item) => item.productId === product.id)
                           .reduce((sum, item) => sum + item.quantity, 0)
@@ -249,7 +324,7 @@ export function InvoiceManagement({
                     max={
                       selectedProduct
                         ? (() => {
-                            const stock = StockService.getProductStock(selectedProduct, productions, sales)
+                            const stock = StockService.getProductStock(selectedProduct, productions, invoices)
                             const quantityInInvoice = formData.items
                               .filter((item) => item.productId === selectedProduct)
                               .reduce((sum, item) => sum + item.quantity, 0)
@@ -267,7 +342,7 @@ export function InvoiceManagement({
                     موجودی قابل استفاده:{" "}
                     {formatPersianNumber(
                       (() => {
-                        const stock = StockService.getProductStock(selectedProduct, productions, sales)
+                        const stock = StockService.getProductStock(selectedProduct, productions, invoices)
                         const quantityInInvoice = formData.items
                           .filter((item) => item.productId === selectedProduct)
                           .reduce((sum, item) => sum + item.quantity, 0)
@@ -285,7 +360,7 @@ export function InvoiceManagement({
                   <div className="border rounded-lg p-4 space-y-2">
                     {formData.items.map((item, index) => {
                       const product = products.find((p) => p.id === item.productId)!
-                      const stock = StockService.getProductStock(item.productId, productions, sales)
+                      const stock = StockService.getProductStock(item.productId, productions, invoices)
                       const quantityInInvoice = formData.items
                         .filter((i) => i.productId === item.productId)
                         .slice(0, index + 1)
@@ -428,18 +503,16 @@ export function InvoiceManagement({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => exportInvoiceToPDF(invoice)}
+                        onClick={async () => {
+                          try {
+                            await exportInvoiceToPDF(invoice)
+                          } catch (error) {
+                            console.error("Export error:", error)
+                          }
+                        }}
                       >
                         <FileText className="h-4 w-4 mr-1" />
                         PDF
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => exportInvoiceToExcel(invoice)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Excel
                       </Button>
                       <Button
                         size="sm"

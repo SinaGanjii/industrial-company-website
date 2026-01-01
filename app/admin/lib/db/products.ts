@@ -1,9 +1,10 @@
 // Products Database Service
-// CRUD operations for products table
+// CRUD operations for products table - Uses secure API routes
 
-import { supabase } from "../supabase/client"
 import type { Product } from "../../types"
 import { dbProductToTS, tsProductToDB } from "./utils"
+
+const API_BASE = "/api/admin/products"
 
 export class ProductsDB {
   /**
@@ -12,23 +13,20 @@ export class ProductsDB {
   static async getAll(): Promise<Product[]> {
     try {
       console.log("[ProductsDB.getAll] Fetching all products...")
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false })
+      const response = await fetch(API_BASE, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) {
-        console.error("[ProductsDB.getAll] Supabase error:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        })
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      console.log("[ProductsDB.getAll] Fetched products count:", data?.length || 0)
-      return (data || []).map(dbProductToTS)
+      const result = await response.json()
+      const data = result.data || []
+      console.log("[ProductsDB.getAll] Fetched products count:", data.length)
+      return data.map(dbProductToTS)
     } catch (error) {
       console.error("[ProductsDB.getAll] Error fetching products:", {
         error,
@@ -44,18 +42,19 @@ export class ProductsDB {
    */
   static async getById(id: string): Promise<Product | null> {
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single()
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) {
-        if (error.code === "PGRST116") return null // Not found
-        throw error
+      if (response.status === 404) return null
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      return data ? dbProductToTS(data) : null
+      const result = await response.json()
+      return result.data ? dbProductToTS(result.data) : null
     } catch (error) {
       console.error("Error fetching product:", error)
       throw new Error("Failed to fetch product")
@@ -71,24 +70,26 @@ export class ProductsDB {
       const dbProduct = tsProductToDB(product)
       console.log("[ProductsDB.create] Converted to DB format:", dbProduct)
 
-      const { data, error } = await supabase
-        .from("products")
-        .insert(dbProduct)
-        .select()
-        .single()
+      const response = await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: product.name,
+          dimensions: product.dimensions,
+          material: product.material,
+          unitPrice: product.unitPrice,
+        }),
+      })
 
-      if (error) {
-        console.error("[ProductsDB.create] Supabase error:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        })
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      console.log("[ProductsDB.create] Product created successfully:", data)
-      return dbProductToTS(data)
+      const result = await response.json()
+      console.log("[ProductsDB.create] Product created successfully:", result.data)
+      return dbProductToTS(result.data)
     } catch (error) {
       console.error("[ProductsDB.create] Error creating product:", {
         error,
@@ -111,19 +112,23 @@ export class ProductsDB {
       const updateData: any = {}
       if (updates.name !== undefined) updateData.name = updates.name
       if (updates.dimensions !== undefined) updateData.dimensions = updates.dimensions
-      if (updates.material !== undefined) updateData.material = updates.material || null
-      if (updates.unitPrice !== undefined) updateData.unit_price = updates.unitPrice
+      if (updates.material !== undefined) updateData.material = updates.material
+      if (updates.unitPrice !== undefined) updateData.unitPrice = updates.unitPrice
 
-      const { data, error } = await supabase
-        .from("products")
-        .update(updateData)
-        .eq("id", id)
-        .select()
-        .single()
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updateData),
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
 
-      return dbProductToTS(data)
+      const result = await response.json()
+      return dbProductToTS(result.data)
     } catch (error) {
       console.error("Error updating product:", error)
       throw new Error("Failed to update product")
@@ -135,9 +140,15 @@ export class ProductsDB {
    */
   static async delete(id: string): Promise<void> {
     try {
-      const { error } = await supabase.from("products").delete().eq("id", id)
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
     } catch (error) {
       console.error("Error deleting product:", error)
       throw new Error("Failed to delete product")
@@ -149,15 +160,11 @@ export class ProductsDB {
    */
   static async searchByName(searchTerm: string): Promise<Product[]> {
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .ilike("name", `%${searchTerm}%`)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbProductToTS)
+      // Fetch all and filter client-side (or add search endpoint later)
+      const allProducts = await this.getAll()
+      return allProducts.filter((p) =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     } catch (error) {
       console.error("Error searching products:", error)
       throw new Error("Failed to search products")

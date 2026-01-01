@@ -1,9 +1,10 @@
 // Productions Database Service
-// CRUD operations for productions table
+// CRUD operations for productions table - Uses secure API routes
 
-import { supabase } from "../supabase/client"
 import type { Production } from "../../types"
 import { dbProductionToTS, tsProductionToDB } from "./utils"
+
+const API_BASE = "/api/admin/productions"
 
 export class ProductionsDB {
   /**
@@ -11,15 +12,18 @@ export class ProductionsDB {
    */
   static async getAll(): Promise<Production[]> {
     try {
-      const { data, error } = await supabase
-        .from("productions")
-        .select("*")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
+      const response = await fetch(API_BASE, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
 
-      return (data || []).map(dbProductionToTS)
+      const result = await response.json()
+      return (result.data || []).map(dbProductionToTS)
     } catch (error) {
       console.error("Error fetching productions:", error)
       throw new Error("Failed to fetch productions")
@@ -31,15 +35,8 @@ export class ProductionsDB {
    */
   static async getByProductId(productId: string): Promise<Production[]> {
     try {
-      const { data, error } = await supabase
-        .from("productions")
-        .select("*")
-        .eq("product_id", productId)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbProductionToTS)
+      const allProductions = await this.getAll()
+      return allProductions.filter((p) => p.productId === productId)
     } catch (error) {
       console.error("Error fetching productions by product:", error)
       throw new Error("Failed to fetch productions")
@@ -51,15 +48,8 @@ export class ProductionsDB {
    */
   static async getByDate(date: string): Promise<Production[]> {
     try {
-      const { data, error } = await supabase
-        .from("productions")
-        .select("*")
-        .eq("date", date)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbProductionToTS)
+      const allProductions = await this.getAll()
+      return allProductions.filter((p) => p.date === date)
     } catch (error) {
       console.error("Error fetching productions by date:", error)
       throw new Error("Failed to fetch productions")
@@ -71,18 +61,19 @@ export class ProductionsDB {
    */
   static async getById(id: string): Promise<Production | null> {
     try {
-      const { data, error } = await supabase
-        .from("productions")
-        .select("*")
-        .eq("id", id)
-        .single()
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) {
-        if (error.code === "PGRST116") return null // Not found
-        throw error
+      if (response.status === 404) return null
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      return data ? dbProductionToTS(data) : null
+      const result = await response.json()
+      return result.data ? dbProductionToTS(result.data) : null
     } catch (error) {
       console.error("Error fetching production:", error)
       throw new Error("Failed to fetch production")
@@ -97,24 +88,26 @@ export class ProductionsDB {
       console.log("[ProductionsDB.create] Starting production creation:", production)
       const dbProduction = tsProductionToDB(production)
 
-      const { data, error } = await supabase
-        .from("productions")
-        .insert(dbProduction)
-        .select()
-        .single()
+      const response = await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          productId: production.productId,
+          quantity: production.quantity,
+          date: production.date,
+        }),
+      })
 
-      if (error) {
-        console.error("[ProductionsDB.create] Supabase error:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        })
-        throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[ProductionsDB.create] API error:", errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
+      const result = await response.json()
       console.log("[ProductionsDB.create] Production created successfully")
-      return dbProductionToTS(data)
+      return dbProductionToTS(result.data)
     } catch (error) {
       console.error("[ProductionsDB.create] Error creating production:", {
         error,
@@ -130,9 +123,15 @@ export class ProductionsDB {
    */
   static async delete(id: string): Promise<void> {
     try {
-      const { error } = await supabase.from("productions").delete().eq("id", id)
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
     } catch (error) {
       console.error("Error deleting production:", error)
       throw new Error("Failed to delete production")
@@ -144,20 +143,11 @@ export class ProductionsDB {
    */
   static async getByDateRange(startDate: string, endDate: string): Promise<Production[]> {
     try {
-      const { data, error } = await supabase
-        .from("productions")
-        .select("*")
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      return (data || []).map(dbProductionToTS)
+      const allProductions = await this.getAll()
+      return allProductions.filter((p) => p.date >= startDate && p.date <= endDate)
     } catch (error) {
       console.error("Error fetching productions by date range:", error)
       throw new Error("Failed to fetch productions")
     }
   }
 }
-

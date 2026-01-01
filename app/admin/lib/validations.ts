@@ -38,6 +38,7 @@ export const costSchema = z.object({
 
 // Schema pour Sale
 export const saleSchema = z.object({
+  invoiceId: z.string().uuid("شناسه فاکتور نامعتبر است"), // Now required - all sales must come from invoices
   customerName: z.string().min(1, "نام مشتری الزامی است").max(255, "نام مشتری نباید بیشتر از 255 کاراکتر باشد"),
   productId: z.string().uuid("شناسه محصول نامعتبر است"),
   productName: z.string().min(1, "نام محصول الزامی است"),
@@ -45,7 +46,6 @@ export const saleSchema = z.object({
   unitPrice: z.number().min(0, "قیمت واحد باید مثبت باشد"),
   totalPrice: z.number().min(0, "قیمت کل باید مثبت باشد"),
   date: z.string().regex(/^\d{4}\/\d{2}\/\d{2}$/, "فرمت تاریخ باید YYYY/MM/DD باشد"),
-  invoiceId: z.string().uuid("شناسه فاکتور نامعتبر است").optional(),
 })
 
 // Schema pour InvoiceItem

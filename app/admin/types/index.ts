@@ -51,11 +51,12 @@ export interface Cost {
 
 /**
  * Sale Record
- * Customer sale transaction
+ * Customer sale transaction (ONLY from invoices - no direct sales)
+ * All sales must be linked to an invoice
  */
 export interface Sale {
   id: string
-  invoiceId?: string // Link to invoice if exists
+  invoiceId: string // REQUIRED: Link to invoice (all sales must come from invoices)
   customerName: string
   productId: string
   productName: string

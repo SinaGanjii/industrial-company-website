@@ -1,10 +1,10 @@
 // Invoices Database Service
-// CRUD operations for invoices table
+// CRUD operations for invoices table - Uses secure API routes
 
-import { supabase } from "../supabase/client"
 import type { Invoice, InvoiceItem } from "../../types"
 import { dbInvoiceToTS, tsInvoiceToDB } from "./utils"
-import { InvoiceItemsDB } from "./invoice_items"
+
+const API_BASE = "/api/admin/invoices"
 
 export class InvoicesDB {
   /**
@@ -12,22 +12,22 @@ export class InvoicesDB {
    */
   static async getAll(): Promise<Invoice[]> {
     try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false })
+      const response = await fetch(API_BASE, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) throw error
-
-      // Fetch items for each invoice
-      const invoices: Invoice[] = []
-      for (const invoiceRow of data || []) {
-        const items = await InvoiceItemsDB.getByInvoiceId(invoiceRow.id)
-        invoices.push(dbInvoiceToTS(invoiceRow, items))
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      return invoices
+      const result = await response.json()
+      // Items are already in DB format from API, pass them directly to dbInvoiceToTS
+      return (result.data || []).map((invoiceRow: any) => {
+        const items = invoiceRow.items || []
+        return dbInvoiceToTS(invoiceRow, items)
+      })
     } catch (error) {
       console.error("Error fetching invoices:", error)
       throw new Error("Failed to fetch invoices")
@@ -39,21 +39,8 @@ export class InvoicesDB {
    */
   static async getByStatus(status: Invoice["status"]): Promise<Invoice[]> {
     try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("status", status)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      const invoices: Invoice[] = []
-      for (const invoiceRow of data || []) {
-        const items = await InvoiceItemsDB.getByInvoiceId(invoiceRow.id)
-        invoices.push(dbInvoiceToTS(invoiceRow, items))
-      }
-
-      return invoices
+      const allInvoices = await this.getAll()
+      return allInvoices.filter((inv) => inv.status === status)
     } catch (error) {
       console.error("Error fetching invoices by status:", error)
       throw new Error("Failed to fetch invoices")
@@ -65,21 +52,23 @@ export class InvoicesDB {
    */
   static async getById(id: string): Promise<Invoice | null> {
     try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("id", id)
-        .single()
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "GET",
+        credentials: "include",
+      })
 
-      if (error) {
-        if (error.code === "PGRST116") return null // Not found
-        throw error
+      if (response.status === 404) return null
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      if (!data) return null
+      const result = await response.json()
+      if (!result.data) return null
 
-      const items = await InvoiceItemsDB.getByInvoiceId(id)
-      return dbInvoiceToTS(data, items)
+      // Items are already in DB format from API, pass them directly to dbInvoiceToTS
+      const items = result.data.items || []
+      return dbInvoiceToTS(result.data, items)
     } catch (error) {
       console.error("Error fetching invoice:", error)
       throw new Error("Failed to fetch invoice")
@@ -91,21 +80,8 @@ export class InvoicesDB {
    */
   static async getByInvoiceNumber(invoiceNumber: string): Promise<Invoice | null> {
     try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("invoice_number", invoiceNumber)
-        .single()
-
-      if (error) {
-        if (error.code === "PGRST116") return null // Not found
-        throw error
-      }
-
-      if (!data) return null
-
-      const items = await InvoiceItemsDB.getByInvoiceId(data.id)
-      return dbInvoiceToTS(data, items)
+      const allInvoices = await this.getAll()
+      return allInvoices.find((inv) => inv.invoiceNumber === invoiceNumber) || null
     } catch (error) {
       console.error("Error fetching invoice by number:", error)
       throw new Error("Failed to fetch invoice")
@@ -120,41 +96,41 @@ export class InvoicesDB {
     items: InvoiceItem[]
   ): Promise<Invoice> {
     try {
-      console.log("[InvoicesDB.create] Starting invoice creation:", { invoice, itemsCount: items.length })
       const dbInvoice = tsInvoiceToDB(invoice)
 
-      // Create invoice
-      const { data: invoiceData, error: invoiceError } = await supabase
-        .from("invoices")
-        .insert(dbInvoice)
-        .select()
-        .single()
+      const response = await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          invoiceNumber: invoice.invoiceNumber,
+          status: invoice.status,
+          customerName: invoice.customerName,
+          customerInfo: invoice.customerInfo,
+          subtotal: invoice.subtotal,
+          tax: invoice.tax,
+          total: invoice.total,
+          date: invoice.date,
+          dueDate: invoice.dueDate,
+          paidDate: invoice.paidDate,
+          notes: invoice.notes,
+          items: items,
+        }),
+      })
 
-      if (invoiceError) {
-        console.error("[InvoicesDB.create] Supabase error (invoice):", {
-          code: invoiceError.code,
-          message: invoiceError.message,
-          details: invoiceError.details,
-          hint: invoiceError.hint,
-        })
-        throw invoiceError
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[InvoicesDB.create] API error:", errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
 
-      console.log("[InvoicesDB.create] Invoice created, ID:", invoiceData.id)
+      const result = await response.json()
+      const invoiceData = result.data
 
-      // Create invoice items
-      if (items.length > 0) {
-        console.log("[InvoicesDB.create] Creating invoice items...")
-        await InvoiceItemsDB.createMany(invoiceData.id, items)
-        console.log("[InvoicesDB.create] Invoice items created")
-      }
+      // Items are already in DB format from API, pass them directly to dbInvoiceToTS
+      const invoiceItems = invoiceData.items || []
 
-      // Fetch complete invoice with items
-      const completeInvoice = await this.getById(invoiceData.id)
-      if (!completeInvoice) throw new Error("Failed to fetch created invoice")
-
-      console.log("[InvoicesDB.create] Invoice created successfully")
-      return completeInvoice
+      return dbInvoiceToTS(invoiceData, invoiceItems)
     } catch (error) {
       console.error("[InvoicesDB.create] Error creating invoice:", {
         error,
@@ -176,42 +152,48 @@ export class InvoicesDB {
   ): Promise<Invoice> {
     try {
       const updateData: any = {}
-      if (updates.invoiceNumber !== undefined) updateData.invoice_number = updates.invoiceNumber
+      if (updates.invoiceNumber !== undefined) updateData.invoiceNumber = updates.invoiceNumber
       if (updates.status !== undefined) updateData.status = updates.status
-      if (updates.customerName !== undefined) updateData.customer_name = updates.customerName
-      if (updates.customerInfo !== undefined) {
-        updateData.customer_address = updates.customerInfo.address || null
-        updateData.customer_phone = updates.customerInfo.phone || null
-        updateData.customer_tax_id = updates.customerInfo.taxId || null
-      }
+      if (updates.customerName !== undefined) updateData.customerName = updates.customerName
+      if (updates.customerInfo !== undefined) updateData.customerInfo = updates.customerInfo
       if (updates.subtotal !== undefined) updateData.subtotal = updates.subtotal
-      if (updates.tax !== undefined) updateData.tax = updates.tax || null
+      if (updates.tax !== undefined) updateData.tax = updates.tax
       if (updates.total !== undefined) updateData.total = updates.total
       if (updates.date !== undefined) updateData.date = updates.date
-      if (updates.dueDate !== undefined) updateData.due_date = updates.dueDate || null
-      if (updates.paidDate !== undefined) updateData.paid_date = updates.paidDate || null
-      if (updates.notes !== undefined) updateData.notes = updates.notes || null
-
-      const { error } = await supabase
-        .from("invoices")
-        .update(updateData)
-        .eq("id", id)
-
-      if (error) throw error
-
-      // Update items if provided
-      if (items !== undefined) {
-        await InvoiceItemsDB.deleteByInvoiceId(id)
-        if (items.length > 0) {
-          await InvoiceItemsDB.createMany(id, items)
+      if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate
+      if (updates.paidDate !== undefined) updateData.paidDate = updates.paidDate
+      if (updates.notes !== undefined) updateData.notes = updates.notes
+      // Only include items if explicitly provided and they are valid
+      if (items !== undefined && Array.isArray(items) && items.length > 0) {
+        // Validate items have all required fields
+        const validItems = items.filter(item => 
+          item.productId && item.productName && item.unitPrice !== null && item.unitPrice !== undefined
+        )
+        if (validItems.length > 0) {
+          updateData.items = validItems
         }
       }
 
-      // Fetch updated invoice
-      const updatedInvoice = await this.getById(id)
-      if (!updatedInvoice) throw new Error("Failed to fetch updated invoice")
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updateData),
+      })
 
-      return updatedInvoice
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      const result = await response.json()
+      const invoiceData = result.data
+
+      // Items are already in DB format, pass them directly to dbInvoiceToTS
+      // which will convert them using dbInvoiceItemToTS
+      const invoiceItems = invoiceData.items || []
+
+      return dbInvoiceToTS(invoiceData, invoiceItems)
     } catch (error) {
       console.error("Error updating invoice:", error)
       throw new Error("Failed to update invoice")
@@ -223,9 +205,15 @@ export class InvoicesDB {
    */
   static async delete(id: string): Promise<void> {
     try {
-      const { error } = await supabase.from("invoices").delete().eq("id", id)
+      const response = await fetch(`${API_BASE}/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
     } catch (error) {
       console.error("Error deleting invoice:", error)
       throw new Error("Failed to delete invoice")
@@ -237,26 +225,11 @@ export class InvoicesDB {
    */
   static async getByDateRange(startDate: string, endDate: string): Promise<Invoice[]> {
     try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: false })
-
-      if (error) throw error
-
-      const invoices: Invoice[] = []
-      for (const invoiceRow of data || []) {
-        const items = await InvoiceItemsDB.getByInvoiceId(invoiceRow.id)
-        invoices.push(dbInvoiceToTS(invoiceRow, items))
-      }
-
-      return invoices
+      const allInvoices = await this.getAll()
+      return allInvoices.filter((inv) => inv.date >= startDate && inv.date <= endDate)
     } catch (error) {
       console.error("Error fetching invoices by date range:", error)
       throw new Error("Failed to fetch invoices")
     }
   }
 }
-

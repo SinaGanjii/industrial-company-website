@@ -2,7 +2,7 @@
 // OOP approach for invoice operations
 
 import type { Invoice, InvoiceItem, Product } from "../types"
-import { getTodayPersianDate } from "../utils/dateUtils"
+import { getTodayPersianDate, convertToWesternDigits } from "../utils/dateUtils"
 
 export class InvoiceService {
   /**
@@ -35,16 +35,12 @@ export class InvoiceService {
   ): Invoice {
     const invoiceNumber = this.generateInvoiceNumber(invoices)
     const subtotal = items.reduce((sum, item) => sum + item.total, 0)
-    const tax = subtotal * 0.09 // 9% VAT (adjustable)
-    const total = subtotal + tax
+    const tax = 0 // No tax - removed as requested
+    const total = subtotal // Total = subtotal (no tax)
 
-    const today = new Date()
-    const persianDate = new Intl.DateTimeFormat("fa-IR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      calendar: "persian",
-    }).format(today)
+    // Get today's date in Persian format and convert to Western digits
+    const persianDate = getTodayPersianDate()
+    const date = convertToWesternDigits(persianDate)
 
     return {
       id: `inv-${Date.now()}`,
@@ -56,7 +52,7 @@ export class InvoiceService {
       subtotal,
       tax,
       total,
-      date: persianDate,
+      date, // Use Western digits format for validation
       notes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -86,10 +82,14 @@ export class InvoiceService {
       throw new Error("Only approved invoices can be marked as paid")
     }
 
+    // Get today's date in Persian format and convert to Western digits
+    const persianDate = getTodayPersianDate()
+    const paidDate = convertToWesternDigits(persianDate)
+
     return {
       ...invoice,
       status: "paid",
-      paidDate: getTodayPersianDate(),
+      paidDate, // Use Western digits format for validation
       updatedAt: new Date().toISOString(),
     }
   }
@@ -108,6 +108,10 @@ export class InvoiceService {
     totalPrice: number
     date: string
   }> {
+    // Convert date to Western digits for validation
+    const invoiceDate = invoice.paidDate || invoice.date
+    const date = convertToWesternDigits(invoiceDate)
+    
     return invoice.items.map((item) => ({
       invoiceId: invoice.id,
       customerName: invoice.customerName,
@@ -116,21 +120,21 @@ export class InvoiceService {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalPrice: item.total,
-      date: invoice.paidDate || invoice.date,
+      date, // Use Western digits format
     }))
   }
 
   /**
    * Calculate invoice totals from items
    */
-  static calculateTotals(items: InvoiceItem[], taxRate: number = 0.09): {
+  static calculateTotals(items: InvoiceItem[], taxRate: number = 0): {
     subtotal: number
     tax: number
     total: number
   } {
     const subtotal = items.reduce((sum, item) => sum + item.total, 0)
-    const tax = subtotal * taxRate
-    const total = subtotal + tax
+    const tax = 0 // No tax - removed as requested
+    const total = subtotal // Total = subtotal (no tax)
 
     return { subtotal, tax, total }
   }

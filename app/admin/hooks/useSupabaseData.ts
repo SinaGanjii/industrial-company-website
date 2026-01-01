@@ -163,37 +163,22 @@ export function useSupabaseData() {
     }
   }, [])
 
-  // Sales operations
-  const addSale = useCallback(async (sale: Omit<Sale, "id" | "createdAt">) => {
-    try {
-      const newSale = await SalesDB.create(sale)
-      setSales((prev) => [newSale, ...prev])
-      return newSale
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create sale"
-      setError(errorMessage)
-      throw err
-    }
-  }, [])
-
+  // Sales operations (only from invoices - no direct sales)
   const addSales = useCallback(async (sales: Array<Omit<Sale, "id" | "createdAt">>) => {
     try {
-      const newSales = await SalesDB.createMany(sales)
+      // Ensure all sales have invoiceId
+      const validSales = sales.map(sale => {
+        if (!sale.invoiceId) {
+          throw new Error("All sales must be linked to an invoice")
+        }
+        return sale
+      })
+      
+      const newSales = await SalesDB.createMany(validSales)
       setSales((prev) => [...newSales, ...prev])
       return newSales
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create sales"
-      setError(errorMessage)
-      throw err
-    }
-  }, [])
-
-  const deleteSale = useCallback(async (id: string) => {
-    try {
-      await SalesDB.delete(id)
-      setSales((prev) => prev.filter((s) => s.id !== id))
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete sale"
       setError(errorMessage)
       throw err
     }
@@ -218,7 +203,10 @@ export function useSupabaseData() {
         const invoice = invoices.find((inv) => inv.id === id)
         if (!invoice) throw new Error("Invoice not found")
 
-        const updatedInvoice = await InvoicesDB.update(id, updates, updates.items)
+        // Preserve items from original invoice if not provided in updates
+        const itemsToUpdate = updates.items !== undefined ? updates.items : invoice.items
+        
+        const updatedInvoice = await InvoicesDB.update(id, updates, itemsToUpdate)
         setInvoices((prev) => prev.map((inv) => (inv.id === id ? updatedInvoice : inv)))
         return updatedInvoice
       } catch (err) {
@@ -267,9 +255,7 @@ export function useSupabaseData() {
     deleteCost,
     setCosts,
     // Sales
-    addSale,
     addSales,
-    deleteSale,
     setSales,
     // Invoices
     addInvoice,

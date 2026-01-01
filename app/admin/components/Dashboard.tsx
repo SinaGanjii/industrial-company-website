@@ -6,16 +6,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Factory, TrendingUp, TrendingDown, DollarSign, Download, Package } from "lucide-react"
-import type { Product, Production, Sale, Cost } from "../types"
+import type { Product, Production, Invoice, Cost } from "../types"
 import { StockService } from "../services/StockService"
 import { CostService } from "../services/CostService"
 import { formatPersianNumber, convertToWesternDigits } from "../utils"
-import { exportDashboardToExcel } from "../utils/exportUtils"
+import { exportDashboardToPDF } from "../utils/exportUtils"
 
 interface DashboardProps {
   products: Product[]
   productions: Production[]
-  sales: Sale[]
+  invoices: Invoice[]
   costs: Cost[]
 }
 
@@ -24,7 +24,9 @@ interface DashboardProps {
  * 
  * 1. Total Production = sum(production.quantity) where production.date is in [startDate, endDate]
  * 
- * 2. Total Sales Revenue = sum(sale.totalPrice) where sale.date is in [startDate, endDate]
+ * 2. Total Sales Revenue = sum(invoice.total) where:
+ *    - invoice.status === "paid"
+ *    - invoice.date (or paidDate) is in [startDate, endDate]
  * 
  * 3. Total Costs = sum(cost.amount) where:
  *    - If cost.periodType === "daily": cost.periodValue (date) is in [startDate, endDate]
@@ -33,9 +35,9 @@ interface DashboardProps {
  * 4. Net Profit = Total Sales Revenue - Total Costs
  * 
  * 5. Current Stock (GLOBAL, not filtered):
- *    stock = total_production_all_time - total_sales_all_time
+ *    stock = total_production_all_time - total_sales_all_time (from paid invoices)
  */
-export function Dashboard({ products, productions, sales, costs }: DashboardProps) {
+export function Dashboard({ products, productions, invoices, costs }: DashboardProps) {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
@@ -44,7 +46,7 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
     if (!startDate || !endDate) {
       return {
         filteredProductions: [],
-        filteredSales: [],
+        filteredInvoices: [],
         filteredCosts: [],
       }
     }
@@ -58,10 +60,11 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
       return prodDate >= normalizedStart && prodDate <= normalizedEnd
     })
 
-    // Filter sales
-    const filteredSales = sales.filter((s) => {
-      const saleDate = convertToWesternDigits(s.date)
-      return saleDate >= normalizedStart && saleDate <= normalizedEnd
+    // Filter invoices (only paid invoices count as sales)
+    const filteredInvoices = invoices.filter((inv) => {
+      if (inv.status !== "paid") return false
+      const invoiceDate = convertToWesternDigits(inv.paidDate || inv.date)
+      return invoiceDate >= normalizedStart && invoiceDate <= normalizedEnd
     })
 
     // Filter costs using CostService
@@ -69,16 +72,16 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
 
     return {
       filteredProductions,
-      filteredSales,
+      filteredInvoices,
       filteredCosts,
     }
   }
 
-  const { filteredProductions, filteredSales, filteredCosts } = getFilteredData()
+  const { filteredProductions, filteredInvoices, filteredCosts } = getFilteredData()
 
   // Calculate KPIs
   const totalProduction = filteredProductions.reduce((sum, p) => sum + p.quantity, 0)
-  const totalSalesRevenue = filteredSales.reduce((sum, s) => sum + s.totalPrice, 0)
+  const totalSalesRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0)
   const totalCosts = filteredCosts.reduce((sum, c) => sum + c.amount, 0)
   const netProfit = totalSalesRevenue - totalCosts
 
@@ -91,8 +94,8 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
     other: filteredCosts.filter((c) => c.type === "other").reduce((sum, c) => sum + c.amount, 0),
   }
 
-  // Current stock (GLOBAL - all time)
-  const stocks = StockService.calculateAllStocks(products, productions, sales)
+  // Current stock (GLOBAL - all time, from paid invoices only)
+  const stocks = StockService.calculateAllStocks(products, productions, invoices)
   const totalStock = stocks.reduce((sum, s) => sum + s.remainingStock, 0)
 
   // Latest items in range (for activity tables)
@@ -100,8 +103,12 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 10)
 
-  const latestSales = filteredSales
-    .sort((a, b) => b.date.localeCompare(a.date))
+  const latestInvoices = filteredInvoices
+    .sort((a, b) => {
+      const aDate = a.paidDate || a.date
+      const bDate = b.paidDate || b.date
+      return bDate.localeCompare(aDate)
+    })
     .slice(0, 10)
 
   const latestCosts = filteredCosts
@@ -121,7 +128,23 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
     }
 
     try {
-      await exportDashboardToExcel({
+      // Convert invoices to sales format for export
+      const filteredSales = filteredInvoices.flatMap(inv => 
+        inv.items.map(item => ({
+          id: `sale-${inv.id}-${item.productId}`,
+          invoiceId: inv.id,
+          customerName: inv.customerName,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.total,
+          date: inv.paidDate || inv.date,
+          createdAt: inv.createdAt,
+        }))
+      )
+
+      await exportDashboardToPDF({
         startDate,
         endDate,
         totalProduction,
@@ -135,7 +158,7 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
       })
     } catch (error) {
       console.error("Export error:", error)
-      alert("خطا در ایجاد فایل Excel")
+      alert("خطا در ایجاد فایل PDF")
     }
   }
 
@@ -175,7 +198,7 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
               className="w-full md:w-auto"
             >
               <Download className="h-4 w-4 mr-2" />
-              خروجی Excel
+              خروجی PDF
             </Button>
           </div>
           {startDate && endDate && startDate > endDate && (
@@ -353,21 +376,24 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
           </CardContent>
         </Card>
 
-        {/* Latest Sales */}
+        {/* Latest Invoices (Sales) */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">آخرین فروشات</CardTitle>
+            <CardTitle className="text-sm">آخرین فاکتورهای پرداخت شده</CardTitle>
           </CardHeader>
           <CardContent>
-            {latestSales.length === 0 ? (
+            {latestInvoices.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-4">داده‌ای یافت نشد</p>
             ) : (
               <div className="space-y-2">
-                {latestSales.map((sale) => (
-                  <div key={sale.id} className="text-xs border-b pb-2">
-                    <div className="font-medium">{sale.customerName}</div>
+                {latestInvoices.map((inv) => (
+                  <div key={inv.id} className="text-xs border-b pb-2">
+                    <div className="font-medium">{inv.customerName}</div>
                     <div className="text-muted-foreground">
-                      {formatPersianNumber(sale.totalPrice)} تومان - {sale.date}
+                      {formatPersianNumber(inv.total)} تومان - {inv.paidDate || inv.date}
+                    </div>
+                    <div className="text-muted-foreground text-[10px]">
+                      {inv.invoiceNumber}
                     </div>
                   </div>
                 ))}
@@ -402,4 +428,3 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
     </div>
   )
 }
-

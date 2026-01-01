@@ -176,13 +176,28 @@ export function tsInvoiceToDB(invoice: Omit<Invoice, "id" | "createdAt" | "updat
 
 // Convert InvoiceItem from DB to TypeScript
 export function dbInvoiceItemToTS(row: InvoiceItemRow): InvoiceItem {
+  // Handle null/undefined values properly
+  const unitPrice = row.unit_price !== null && row.unit_price !== undefined 
+    ? Number(row.unit_price) 
+    : 0
+  const total = row.total !== null && row.total !== undefined 
+    ? Number(row.total) 
+    : 0
+  
+  if (isNaN(unitPrice)) {
+    console.warn(`[dbInvoiceItemToTS] Invalid unit_price:`, row.unit_price)
+  }
+  if (isNaN(total)) {
+    console.warn(`[dbInvoiceItemToTS] Invalid total:`, row.total)
+  }
+  
   return {
-    productId: row.product_id,
-    productName: row.product_name,
-    dimensions: row.dimensions,
-    quantity: row.quantity,
-    unitPrice: Number(row.unit_price),
-    total: Number(row.total),
+    productId: row.product_id || "",
+    productName: row.product_name || "",
+    dimensions: row.dimensions || "",
+    quantity: row.quantity || 0,
+    unitPrice: unitPrice,
+    total: total,
   }
 }
 
