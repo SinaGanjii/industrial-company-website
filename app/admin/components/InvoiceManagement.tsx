@@ -289,9 +289,9 @@ export function InvoiceManagement({
 
               <div className="space-y-2">
                 <Label>افزودن محصول</Label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                    <SelectTrigger className="flex-1">
+                    <SelectTrigger className="flex-1 min-w-0">
                       <SelectValue placeholder="انتخاب محصول" />
                     </SelectTrigger>
                     <SelectContent>
@@ -306,36 +306,44 @@ export function InvoiceManagement({
                             key={product.id} 
                             value={product.id}
                             disabled={availableStock <= 0}
+                            className="break-words"
                           >
-                            {product.name} - {formatPersianNumber(product.unitPrice)} تومان
-                            {availableStock <= 0 ? " (موجودی: ۰)" : ` (موجودی: ${formatPersianNumber(availableStock)})`}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                              <span className="font-medium break-words">{product.name}</span>
+                              <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+                                {formatPersianNumber(product.unitPrice)} تومان
+                                {availableStock <= 0 ? " (موجودی: ۰)" : ` (موجودی: ${formatPersianNumber(availableStock)})`}
+                              </span>
+                            </div>
                           </SelectItem>
                         )
                       })}
                     </SelectContent>
                   </Select>
-                  <Input
-                    type="number"
-                    value={itemQuantity}
-                    onChange={(e) => setItemQuantity(e.target.value)}
-                    placeholder="تعداد"
-                    className="w-32"
-                    min="1"
-                    max={
-                      selectedProduct
-                        ? (() => {
-                            const stock = StockService.getProductStock(selectedProduct, productions, invoices)
-                            const quantityInInvoice = formData.items
-                              .filter((item) => item.productId === selectedProduct)
-                              .reduce((sum, item) => sum + item.quantity, 0)
-                            return stock - quantityInInvoice
-                          })()
-                        : undefined
-                    }
-                  />
-                  <Button type="button" onClick={handleAddItem}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={itemQuantity}
+                      onChange={(e) => setItemQuantity(e.target.value)}
+                      placeholder="تعداد"
+                      className="w-24 sm:w-32"
+                      min="1"
+                      max={
+                        selectedProduct
+                          ? (() => {
+                              const stock = StockService.getProductStock(selectedProduct, productions, invoices)
+                              const quantityInInvoice = formData.items
+                                .filter((item) => item.productId === selectedProduct)
+                                .reduce((sum, item) => sum + item.quantity, 0)
+                              return stock - quantityInInvoice
+                            })()
+                          : undefined
+                      }
+                    />
+                    <Button type="button" onClick={handleAddItem} className="shrink-0">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 {selectedProduct && (
                   <p className="text-xs text-muted-foreground">
@@ -369,15 +377,17 @@ export function InvoiceManagement({
                       return (
                         <div
                           key={index}
-                          className={`flex items-center justify-between p-2 rounded ${
+                          className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between p-2 rounded ${
                             availableStock < item.quantity ? "bg-red-500/10 border border-red-500/20" : "bg-muted"
                           }`}
                         >
-                          <div className="flex-1">
-                            <span>
-                              {product.name} × {item.quantity} ={" "}
-                              {formatPersianNumber(product.unitPrice * item.quantity)} تومان
-                            </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                              <span className="break-words font-medium">{product.name}</span>
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                × {item.quantity} = {formatPersianNumber(product.unitPrice * item.quantity)} تومان
+                              </span>
+                            </div>
                             {availableStock < item.quantity && (
                               <p className="text-xs text-red-600 mt-1">
                                 ⚠️ موجودی کافی نیست (موجودی: {formatPersianNumber(stock)})
@@ -388,6 +398,7 @@ export function InvoiceManagement({
                             size="sm"
                             variant="ghost"
                             onClick={() => handleRemoveItem(index)}
+                            className="shrink-0 self-start sm:self-center"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -457,9 +468,9 @@ export function InvoiceManagement({
                     key={invoice.id}
                     className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className="font-mono text-sm">{invoice.invoiceNumber}</span>
                           <span
                             className={`text-xs px-2 py-1 rounded-full ${getStatusColor(invoice.status)}`}
@@ -467,10 +478,10 @@ export function InvoiceManagement({
                             {getStatusLabel(invoice.status)}
                           </span>
                         </div>
-                        <h4 className="font-semibold text-foreground">{invoice.customerName}</h4>
+                        <h4 className="font-semibold text-foreground break-words">{invoice.customerName}</h4>
                         <p className="text-sm text-muted-foreground">تاریخ: {invoice.date}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right sm:text-left sm:shrink-0">
                         <div className="text-lg font-bold text-foreground">
                           {formatPersianNumber(invoice.total)} تومان
                         </div>
@@ -479,7 +490,7 @@ export function InvoiceManagement({
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {invoice.status === "draft" && (
                         <Button
                           size="sm"
