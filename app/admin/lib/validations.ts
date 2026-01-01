@@ -40,7 +40,7 @@ export const productionSchema = z.object({
 
 // Schema pour Cost
 export const costSchema = z.object({
-  type: z.enum(["electricity", "water", "gas", "salary", "other"], {
+  type: z.enum(["electricity", "water", "gas", "salary", "rent", "other"], {
     errorMap: () => ({ message: "نوع هزینه نامعتبر است" }),
   }),
   typeLabel: z.string().min(1, "برچسب نوع هزینه الزامی است"),
@@ -88,6 +88,7 @@ export const invoiceSchema = z.object({
   }).optional(),
   items: z.array(invoiceItemSchema).min(1, "فاکتور باید حداقل یک آیتم داشته باشد"),
   subtotal: z.number().min(0, "جمع کل باید مثبت باشد"),
+  discount: z.number().min(0, "تخفیف باید مثبت باشد").optional().nullable(),
   tax: z.number().min(0, "مالیات باید مثبت باشد").optional().nullable(),
   total: z.number().min(0, "مجموع باید مثبت باشد"),
   date: z.string().regex(/^\d{4}\/\d{2}\/\d{2}$/, "فرمت تاریخ باید YYYY/MM/DD باشد"),

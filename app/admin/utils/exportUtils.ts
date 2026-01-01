@@ -872,7 +872,29 @@ export async function exportInvoiceToPDF(invoice: Invoice): Promise<void> {
           ${itemsRows}
         </tbody>
       </table>
-      <div class="total">جمع کل: ${formatPersianNumber(invoice.total)} تومان</div>
+      <div class="total">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px;">
+          <span><strong>جمع کل:</strong></span>
+          <span><strong>${formatPersianNumber(invoice.subtotal)} تومان</strong></span>
+        </div>
+        ${(() => {
+          // Calculate discount: either from invoice.discount or from difference
+          const discountAmount = invoice.discount !== undefined && invoice.discount !== null 
+            ? invoice.discount 
+            : (invoice.subtotal > invoice.total ? invoice.subtotal - invoice.total : 0);
+          
+          return discountAmount > 0 ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background-color: #fef2f2; border: 2px solid #dc2626; border-radius: 6px; color: #dc2626; font-size: 14px; font-weight: bold;">
+          <span><strong>تخفیف (Promotion):</strong></span>
+          <span><strong>-${formatPersianNumber(Math.round(discountAmount))} تومان</strong></span>
+        </div>
+        ` : "";
+        })()}
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 3px solid #1e40af; padding-top: 12px; margin-top: 12px; color: #1f2937;">
+          <span><strong>مبلغ نهایی:</strong></span>
+          <span><strong>${formatPersianNumber(invoice.total)} تومان</strong></span>
+        </div>
+      </div>
       ${invoice.notes ? `<div class="notes"><strong>یادداشت:</strong> ${invoice.notes}</div>` : ""}
     `
 
@@ -908,7 +930,11 @@ export async function exportInvoiceToExcel(invoice: Invoice): Promise<void> {
         formatPersianNumber(item.total),
       ]),
       [],
-      ["جمع کل", "", "", "", formatPersianNumber(invoice.total)],
+      ["جمع کل", "", "", "", formatPersianNumber(invoice.subtotal)],
+      ...(invoice.discount && invoice.discount > 0 ? [
+        ["تخفیف", "", "", "", `-${formatPersianNumber(invoice.discount)}`],
+      ] : []),
+      ["مبلغ نهایی", "", "", "", formatPersianNumber(invoice.total)],
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(invoiceData)
@@ -1043,8 +1069,9 @@ export async function exportDashboardToPDF(data: {
     electricity: number
     water: number
     gas: number
-    salary: number
+    rent?: number
     other: number
+    salary?: number // Optional: for backward compatibility with old data
   }
   filteredProductions: Production[]
   filteredSales: Sale[]
@@ -1081,7 +1108,7 @@ export async function exportDashboardToPDF(data: {
             <th>برق</th>
             <th>آب</th>
             <th>گاز</th>
-            <th>حقوق</th>
+            ${data.costBreakdown.rent ? '<th>اجاره</th>' : ''}
             <th>سایر</th>
           </tr>
         </thead>
@@ -1090,7 +1117,7 @@ export async function exportDashboardToPDF(data: {
             <td style="text-align: center;">${formatPersianNumber(data.costBreakdown.electricity)}</td>
             <td style="text-align: center;">${formatPersianNumber(data.costBreakdown.water)}</td>
             <td style="text-align: center;">${formatPersianNumber(data.costBreakdown.gas)}</td>
-            <td style="text-align: center;">${formatPersianNumber(data.costBreakdown.salary)}</td>
+            ${data.costBreakdown.rent ? `<td style="text-align: center;">${formatPersianNumber(data.costBreakdown.rent)}</td>` : ''}
             <td style="text-align: center;">${formatPersianNumber(data.costBreakdown.other)}</td>
           </tr>
         </tbody>
@@ -1209,8 +1236,9 @@ export async function exportDashboardToExcel(data: {
     electricity: number
     water: number
     gas: number
-    salary: number
+    rent?: number
     other: number
+    salary?: number // Optional: for backward compatibility with old data
   }
   filteredProductions: Production[]
   filteredSales: Sale[]
@@ -1256,7 +1284,7 @@ export async function exportDashboardToExcel(data: {
       ["برق", formatPersianNumber(data.costBreakdown.electricity), "", ""],
       ["آب", formatPersianNumber(data.costBreakdown.water), "", ""],
       ["گاز", formatPersianNumber(data.costBreakdown.gas), "", ""],
-      ["حقوق", formatPersianNumber(data.costBreakdown.salary), "", ""],
+      ...(data.costBreakdown.rent ? [["اجاره", formatPersianNumber(data.costBreakdown.rent), "", ""]] : []),
       ["سایر", formatPersianNumber(data.costBreakdown.other), "", ""],
       [],
       // List of costs
@@ -1359,16 +1387,17 @@ export async function exportCostsToPDF(costs: Cost[]): Promise<void> {
       return
     }
 
-    // Group costs by type for summary
+    // Group costs by type for summary (all values as integers)
+    // Note: Salaries are now managed separately in SalaryManagement
     const costBreakdown = {
-      electricity: costs.filter((c) => c.type === "electricity").reduce((sum, c) => sum + c.amount, 0),
-      water: costs.filter((c) => c.type === "water").reduce((sum, c) => sum + c.amount, 0),
-      gas: costs.filter((c) => c.type === "gas").reduce((sum, c) => sum + c.amount, 0),
-      salary: costs.filter((c) => c.type === "salary").reduce((sum, c) => sum + c.amount, 0),
-      other: costs.filter((c) => c.type === "other").reduce((sum, c) => sum + c.amount, 0),
+      electricity: Math.round(costs.filter((c) => c.type === "electricity").reduce((sum, c) => sum + c.amount, 0)),
+      water: Math.round(costs.filter((c) => c.type === "water").reduce((sum, c) => sum + c.amount, 0)),
+      gas: Math.round(costs.filter((c) => c.type === "gas").reduce((sum, c) => sum + c.amount, 0)),
+      rent: Math.round(costs.filter((c) => c.type === "rent").reduce((sum, c) => sum + c.amount, 0)),
+      other: Math.round(costs.filter((c) => c.type === "other").reduce((sum, c) => sum + c.amount, 0)),
     }
 
-    const totalCosts = costBreakdown.electricity + costBreakdown.water + costBreakdown.gas + costBreakdown.salary + costBreakdown.other
+    const totalCosts = Math.round(costBreakdown.electricity + costBreakdown.water + costBreakdown.gas + (costBreakdown.rent || 0) + costBreakdown.other)
 
     // Sort costs by period value (newest first)
     const sortedCosts = [...costs].sort((a, b) => {
@@ -1392,10 +1421,12 @@ export async function exportCostsToPDF(costs: Cost[]): Promise<void> {
           <div class="label">گاز</div>
           <div class="value">${formatPersianNumber(costBreakdown.gas)} تومان</div>
         </div>
+        ${costBreakdown.rent > 0 ? `
         <div class="kpi-card">
-          <div class="label">حقوق</div>
-          <div class="value">${formatPersianNumber(costBreakdown.salary)} تومان</div>
+          <div class="label">اجاره</div>
+          <div class="value">${formatPersianNumber(costBreakdown.rent)} تومان</div>
         </div>
+        ` : ''}
         <div class="kpi-card">
           <div class="label">سایر</div>
           <div class="value">${formatPersianNumber(costBreakdown.other)} تومان</div>
@@ -1445,6 +1476,178 @@ export async function exportCostsToPDF(costs: Cost[]): Promise<void> {
       }
       alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
     }
+}
+
+/**
+ * Export Salary Payslip to PDF
+ */
+export async function exportSalaryPayslipToPDF(summary: {
+  employeeId: string
+  employeeName: string
+  month: string
+  totalDaysWorked: number
+  expectedSalary: number
+  totalPaid: number
+  remaining: number
+  payments: Array<{
+    id: string
+    paymentDate: string
+    dailySalary: number
+    amount: number
+    daysWorked: number
+    paymentMethod: "cash" | "transfer" | "check"
+    description?: string
+  }>
+}): Promise<void> {
+  try {
+    const paymentsRows = summary.payments.map(
+      (payment) => {
+        const paymentMethodLabel = 
+          payment.paymentMethod === "cash" ? "نقدی" :
+          payment.paymentMethod === "transfer" ? "واریز" : "چک"
+        return `
+        <tr>
+          <td>${payment.paymentDate}</td>
+          <td>${formatPersianNumber(payment.dailySalary)} تومان</td>
+          <td style="text-align: center;">${formatPersianNumber(payment.daysWorked)}</td>
+          <td>${formatPersianNumber(payment.amount)} تومان</td>
+          <td>${paymentMethodLabel}</td>
+          <td>${payment.description || "-"}</td>
+        </tr>
+      `
+      }
+    ).join("")
+
+    const htmlContent = `
+      <div class="header">فیش حقوق</div>
+      <div class="subheader">ماه: ${summary.month}</div>
+      <div class="info-row">
+        <span><strong>نام کارمند:</strong> ${summary.employeeName}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>تعداد روزهای کار:</strong> ${formatPersianNumber(summary.totalDaysWorked)} روز</span>
+        <span><strong>حقوق مورد انتظار:</strong> ${formatPersianNumber(summary.expectedSalary)} تومان</span>
+      </div>
+      
+      ${summary.payments.length > 0 ? `
+      <div class="subheader">جزئیات پرداخت‌ها</div>
+      <table>
+        <thead>
+          <tr>
+            <th>تاریخ پرداخت</th>
+            <th>حقوق روزانه</th>
+            <th>تعداد روزها</th>
+            <th>مبلغ</th>
+            <th>نوع پرداخت</th>
+            <th>شرح</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${paymentsRows}
+        </tbody>
+      </table>
+      ` : ""}
+      
+      <div class="total">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px;">
+          <span><strong>حقوق مورد انتظار:</strong></span>
+          <span><strong>${formatPersianNumber(summary.expectedSalary)} تومان</strong></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; color: #16a34a;">
+          <span><strong>پرداخت شده:</strong></span>
+          <span><strong>${formatPersianNumber(summary.totalPaid)} تومان</strong></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 3px solid #1e40af; padding-top: 12px; margin-top: 12px; color: #1f2937;">
+          <span>باقیمانده:</span>
+          <span style="color: ${summary.remaining > 0 ? "#dc2626" : "#16a34a"};">
+            ${formatPersianNumber(summary.remaining)} تومان
+          </span>
+        </div>
+      </div>
+    `
+
+    createPDFFromHTML(htmlContent, `فیش-حقوق-${summary.employeeName}-${summary.month}`)
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("Error exporting salary payslip to PDF:", error)
+    }
+    alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
+  }
+}
+
+/**
+ * Export Loan Report to PDF
+ */
+export async function exportLoanReportToPDF(summary: {
+  personId: string
+  personName: string
+  totalBalance: number
+  totalLent: number
+  totalBorrowed: number
+  transactions: Array<{
+    id: string
+    transactionDate: string
+    transactionType: "lend" | "borrow"
+    amount: number
+    description?: string
+  }>
+}): Promise<void> {
+  try {
+    const transactionsRows = summary.transactions.map(
+      (transaction) => {
+        const isLend = transaction.transactionType === "lend"
+        const amountText = `${isLend ? "+" : "-"}${formatPersianNumber(Math.abs(transaction.amount))}`
+        const typeText = isLend ? "قرض دادیم" : "قرض گرفتیم"
+        return `
+        <tr>
+          <td>${transaction.transactionDate}</td>
+          <td>${typeText}</td>
+          <td style="color: ${isLend ? "#16a34a" : "#dc2626"};">${amountText} تومان</td>
+          <td>${transaction.description || "-"}</td>
+        </tr>
+      `
+      }
+    ).join("")
+
+    const htmlContent = `
+      <div class="header">گزارش تراکنش‌های مالی</div>
+      <div class="info-row">
+        <span><strong>نام شخص:</strong> ${summary.personName}</span>
+      </div>
+      <div class="info-row">
+        <span><strong>موجودی کل:</strong> ${formatPersianNumber(summary.totalBalance)} تومان</span>
+        <span>(${summary.totalBalance > 0 ? "به ما بدهکار" : summary.totalBalance < 0 ? "ما بدهکاریم" : "صفر"})</span>
+      </div>
+      <div class="info-row">
+        <span><strong>کل قرض داده شده:</strong> ${formatPersianNumber(summary.totalLent)} تومان</span>
+        <span><strong>کل قرض گرفته شده:</strong> ${formatPersianNumber(summary.totalBorrowed)} تومان</span>
+      </div>
+      
+      ${summary.transactions.length > 0 ? `
+      <div class="subheader">جزئیات تراکنش‌ها</div>
+      <table>
+        <thead>
+          <tr>
+            <th>تاریخ</th>
+            <th>نوع</th>
+            <th>مبلغ</th>
+            <th>شرح</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${transactionsRows}
+        </tbody>
+      </table>
+      ` : "<div class='subheader'>تراکنشی ثبت نشده است</div>"}
+    `
+
+    createPDFFromHTML(htmlContent, `گزارش-قرض-${summary.personName}`)
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("Error exporting loan report to PDF:", error)
+    }
+    alert("خطا در ایجاد فایل PDF. لطفاً دوباره تلاش کنید.")
+  }
 }
 
 /**

@@ -15,6 +15,7 @@ const updateInvoiceSchema = z.object({
     taxId: z.string().nullable().optional(),
   }).optional(),
   subtotal: z.number().optional(),
+  discount: z.number().nullable().optional(),
   tax: z.number().nullable().optional(),
   total: z.number().optional(),
   date: z.string().regex(/^\d{4}\/\d{2}\/\d{2}$/, "فرمت تاریخ باید YYYY/MM/DD باشد").optional(),
@@ -108,6 +109,7 @@ export async function PATCH(
       updateData.customer_tax_id = validationResult.data.customerInfo.taxId
     }
     if (validationResult.data.subtotal !== undefined) updateData.subtotal = validationResult.data.subtotal
+    if (validationResult.data.discount !== undefined) updateData.discount = validationResult.data.discount
     if (validationResult.data.tax !== undefined) updateData.tax = validationResult.data.tax
     if (validationResult.data.total !== undefined) updateData.total = validationResult.data.total
     if (validationResult.data.date !== undefined) updateData.date = validationResult.data.date

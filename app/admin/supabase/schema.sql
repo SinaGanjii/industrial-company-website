@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS productions (
 -- Costs Table
 CREATE TABLE IF NOT EXISTS costs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  type VARCHAR(20) NOT NULL CHECK (type IN ('electricity', 'water', 'gas', 'salary', 'other')),
+  type VARCHAR(20) NOT NULL CHECK (type IN ('electricity', 'water', 'gas', 'salary', 'rent', 'other')),
   type_label VARCHAR(50) NOT NULL,
   amount DECIMAL(12, 2) NOT NULL CHECK (amount >= 0),
   date VARCHAR(20) NOT NULL, -- Persian date format: YYYY/MM/DD
@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   customer_phone VARCHAR(50),
   customer_tax_id VARCHAR(50),
   subtotal DECIMAL(12, 2) NOT NULL CHECK (subtotal >= 0),
+  discount DECIMAL(12, 2) CHECK (discount >= 0), -- Promotion/discount amount in tomans (optional)
   tax DECIMAL(12, 2) CHECK (tax >= 0) DEFAULT 0,
   total DECIMAL(12, 2) NOT NULL CHECK (total >= 0),
   date VARCHAR(20) NOT NULL, -- Persian date format: YYYY/MM/DD
@@ -259,15 +260,81 @@ GROUP BY p.id, p.name;
 -- COMMENTS (Documentation)
 -- =====================================================
 
+-- Employees Table
+CREATE TABLE IF NOT EXISTS employees (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  phone VARCHAR(50),
+  address TEXT,
+  is_active BOOLEAN DEFAULT true,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Salary Payments Table
+CREATE TABLE IF NOT EXISTS salary_payments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  employee_name VARCHAR(255) NOT NULL,
+  month VARCHAR(7) NOT NULL,
+  payment_date VARCHAR(20) NOT NULL,
+  daily_salary DECIMAL(12, 2) NOT NULL CHECK (daily_salary >= 0),
+  amount DECIMAL(12, 2) NOT NULL CHECK (amount >= 0),
+  days_worked INTEGER NOT NULL CHECK (days_worked > 0),
+  payment_method VARCHAR(20) NOT NULL CHECK (payment_method IN ('cash', 'transfer', 'check')),
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for employees
+CREATE INDEX IF NOT EXISTS idx_employees_name ON employees(name);
+CREATE INDEX IF NOT EXISTS idx_employees_is_active ON employees(is_active);
+CREATE INDEX IF NOT EXISTS idx_employees_created_at ON employees(created_at);
+
+-- Indexes for salary_payments
+CREATE INDEX IF NOT EXISTS idx_salary_payments_employee_id ON salary_payments(employee_id);
+CREATE INDEX IF NOT EXISTS idx_salary_payments_month ON salary_payments(month);
+CREATE INDEX IF NOT EXISTS idx_salary_payments_payment_date ON salary_payments(payment_date);
+CREATE INDEX IF NOT EXISTS idx_salary_payments_created_at ON salary_payments(created_at);
+
+-- Trigger for employees updated_at
+CREATE TRIGGER update_employees_updated_at
+  BEFORE UPDATE ON employees
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- RLS Policies for employees
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all operations for employees" ON employees
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+-- RLS Policies for salary_payments
+ALTER TABLE salary_payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all operations for salary_payments" ON salary_payments
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
 COMMENT ON TABLE products IS 'Products manufactured in the workshop';
 COMMENT ON TABLE productions IS 'Daily production records';
-COMMENT ON TABLE costs IS 'Production costs (electricity, water, gas, salaries)';
+COMMENT ON TABLE costs IS 'Production costs (electricity, water, gas, rent, other)';
 COMMENT ON TABLE sales IS 'Customer sales transactions';
 COMMENT ON TABLE invoices IS 'Professional invoices with status workflow';
 COMMENT ON TABLE invoice_items IS 'Items in each invoice';
+COMMENT ON TABLE employees IS 'Employee information and daily salary rates';
+COMMENT ON TABLE salary_payments IS 'Salary payments (can be partial payments throughout the month)';
 
 COMMENT ON COLUMN productions.date IS 'Persian date format: YYYY/MM/DD';
 COMMENT ON COLUMN costs.date IS 'Persian date format: YYYY/MM/DD';
 COMMENT ON COLUMN sales.date IS 'Persian date format: YYYY/MM/DD';
 COMMENT ON COLUMN invoices.date IS 'Persian date format: YYYY/MM/DD';
+COMMENT ON TABLE employees IS 'Employee information (daily salary is managed per payment, not per employee)';
+COMMENT ON COLUMN salary_payments.month IS 'Month in Persian format: YYYY/MM';
+COMMENT ON COLUMN salary_payments.daily_salary IS 'Daily salary rate for this specific payment (for reference)';
+COMMENT ON COLUMN salary_payments.days_worked IS 'Number of days this payment covers';
+COMMENT ON COLUMN salary_payments.amount IS 'Payment amount in tomans (calculated automatically)';
+COMMENT ON COLUMN salary_payments.payment_method IS 'Payment method: cash (نقدی), transfer (واریز), or check (چک)';
 

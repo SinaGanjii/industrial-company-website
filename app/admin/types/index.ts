@@ -31,12 +31,13 @@ export interface Production {
 
 /**
  * Cost Record
- * Production costs: electricity, water, gas, salaries
+ * Production costs: electricity, water, gas, rent, other
+ * Note: Salaries are now managed separately in SalaryManagement
  * Period-based system: costs are linked to periods, not products
  */
 export interface Cost {
   id: string
-  type: "electricity" | "water" | "gas" | "salary" | "other"
+  type: "electricity" | "water" | "gas" | "rent" | "other"
   typeLabel: string
   amount: number
   periodType: "daily" | "monthly"
@@ -46,6 +47,71 @@ export interface Cost {
   date?: string // DEPRECATED: Use periodValue instead
   productId?: string // DEPRECATED: No longer used
   productionDate?: string // DEPRECATED: No longer used
+  createdAt: string
+}
+
+/**
+ * Employee Entity
+ * Employee information (daily salary is managed per payment, not per employee)
+ */
+export interface Employee {
+  id: string
+  name: string
+  phone?: string
+  address?: string
+  isActive: boolean
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Salary Payment Record
+ * Tracks salary payments (can be partial payments throughout the month)
+ * dailySalary can differ from employee's default dailySalary for flexibility
+ */
+export interface SalaryPayment {
+  id: string
+  employeeId: string
+  employeeName: string // Denormalized for performance
+  month: string // Format: YYYY/MM (Persian calendar)
+  paymentDate: string // Persian date format: YYYY/MM/DD
+  dailySalary: number // Daily salary rate for this specific payment (can differ from employee default)
+  amount: number // Payment amount in tomans
+  daysWorked: number // Number of days this payment covers
+  paymentMethod: "cash" | "transfer" | "check" // Payment method: cash (نقدی), transfer (واریز), check (چک)
+  description?: string
+  createdAt: string
+}
+
+/**
+ * Person Entity
+ * People we have financial transactions with (creditors/debtors)
+ */
+export interface Person {
+  id: string
+  name: string
+  phone?: string
+  address?: string
+  notes?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Loan Transaction Record
+ * Positive amount = we lent to them (they owe us)
+ * Negative amount = they lent to us (we owe them)
+ */
+export interface Loan {
+  id: string
+  personId: string
+  personName: string // Denormalized for performance
+  transactionType: "lend" | "borrow" // lend = we lent, borrow = they lent us
+  amount: number // Positive for lend, negative for borrow
+  transactionDate: string // Persian date format: YYYY/MM/DD
+  description?: string
   createdAt: string
 }
 
@@ -83,6 +149,7 @@ export interface Invoice {
   }
   items: InvoiceItem[]
   subtotal: number
+  discount?: number // Promotion amount in tomans
   tax?: number
   total: number
   date: string

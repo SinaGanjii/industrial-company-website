@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
         customer_phone: validationResult.data.customerInfo?.phone || null,
         customer_tax_id: validationResult.data.customerInfo?.taxId || null,
         subtotal: validationResult.data.subtotal,
+        discount: validationResult.data.discount || null,
         tax: validationResult.data.tax || null,
         total: validationResult.data.total,
         date: validationResult.data.date,

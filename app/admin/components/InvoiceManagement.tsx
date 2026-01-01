@@ -41,6 +41,7 @@ export function InvoiceManagement({
     customerPhone: "",
     customerTaxId: "",
     items: [] as Array<{ productId: string; quantity: number }>,
+    discount: "",
     notes: "",
   })
   const [selectedProduct, setSelectedProduct] = useState("")
@@ -96,6 +97,8 @@ export function InvoiceManagement({
       return InvoiceService.createInvoiceItem(product, item.quantity)
     })
 
+    const discountAmount = formData.discount ? Number.parseFloat(formData.discount) : 0
+
     const invoice = InvoiceService.createInvoice(
       formData.customerName,
       invoiceItems,
@@ -105,7 +108,8 @@ export function InvoiceManagement({
         phone: formData.customerPhone || undefined,
         taxId: formData.customerTaxId || undefined,
       },
-      formData.notes || undefined
+      formData.notes || undefined,
+      discountAmount > 0 ? discountAmount : undefined
     )
 
     onAdd(invoice)
@@ -116,6 +120,7 @@ export function InvoiceManagement({
       customerPhone: "",
       customerTaxId: "",
       items: [],
+      discount: "",
       notes: "",
     })
   }
@@ -174,7 +179,9 @@ export function InvoiceManagement({
     try {
       let updatedInvoice: Invoice | undefined
       try {
-        updatedInvoice = await onUpdate(invoice.id, paid)
+        await onUpdate(invoice.id, paid)
+        // After update, use paid invoice with original items
+        updatedInvoice = { ...paid, items: invoice.items }
       } catch (updateError) {
         // If update fails, use paid invoice with original items
         updatedInvoice = { ...paid, items: invoice.items }
@@ -385,7 +392,7 @@ export function InvoiceManagement({
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                               <span className="break-words font-medium">{product.name}</span>
                               <span className="text-sm text-muted-foreground whitespace-nowrap">
-                                × {item.quantity} = {formatPersianNumber(product.unitPrice * item.quantity)} تومان
+                                × {item.quantity} = {formatPersianNumber(Math.round(product.unitPrice * item.quantity))} تومان
                               </span>
                             </div>
                             {availableStock < item.quantity && (
@@ -405,23 +412,67 @@ export function InvoiceManagement({
                         </div>
                       )
                     })}
-                    <div className="pt-2 border-t">
-                      <div className="flex justify-between font-bold">
+                    <div className="pt-2 border-t space-y-2">
+                      <div className="flex justify-between">
                         <span>جمع کل:</span>
                         <span>
                           {formatPersianNumber(
-                            formData.items.reduce((sum, item) => {
-                              const product = products.find((p) => p.id === item.productId)!
-                              return sum + product.unitPrice * item.quantity
-                            }, 0)
+                            Math.round(
+                              formData.items.reduce((sum, item) => {
+                                const product = products.find((p) => p.id === item.productId)!
+                                return sum + product.unitPrice * item.quantity
+                              }, 0)
+                            )
                           )}{" "}
                           تومان
                         </span>
                       </div>
+                      {formData.discount && Number.parseFloat(formData.discount) > 0 && (
+                        <>
+                          <div className="flex justify-between text-red-600">
+                            <span>تخفیف:</span>
+                            <span>
+                              -{formatPersianNumber(Math.round(Number.parseFloat(formData.discount)))}{" "}
+                              تومان
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-bold border-t pt-2">
+                            <span>مبلغ نهایی:</span>
+                            <span>
+                              {formatPersianNumber(
+                                Math.max(
+                                  0,
+                                  Math.round(
+                                    formData.items.reduce((sum, item) => {
+                                      const product = products.find((p) => p.id === item.productId)!
+                                      return sum + product.unitPrice * item.quantity
+                                    }, 0) - Number.parseFloat(formData.discount || "0")
+                                  )
+                                )
+                              )}{" "}
+                              تومان
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>تخفیف (تومان)</Label>
+                <Input
+                  type="number"
+                  value={formData.discount}
+                  onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+                  placeholder="۰"
+                  min="0"
+                />
+                <p className="text-xs text-muted-foreground">
+                  مبلغ تخفیف به تومان (اختیاری)
+                </p>
+              </div>
 
               <div className="space-y-2">
                 <Label>یادداشت</Label>

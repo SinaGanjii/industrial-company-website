@@ -22,6 +22,8 @@ import {
   BarChart3,
   FileText,
   ShoppingCart,
+  Users,
+  CreditCard,
 } from "lucide-react"
 
 // Import new types and services
@@ -32,6 +34,8 @@ import { ProductManagement } from "./components/ProductManagement"
 import { ProductionManagement } from "./components/ProductionManagement"
 import { CostManagement } from "./components/CostManagement"
 import { InvoiceManagement } from "./components/InvoiceManagement"
+import { SalaryManagement } from "./components/SalaryManagement"
+import { LoanManagement } from "./components/LoanManagement"
 import { getTodayPersianDate } from "./utils"
 import { AuthProvider, useAuth } from "./providers/AuthProvider"
 import { useToast } from "@/components/ui/use-toast"
@@ -49,6 +53,10 @@ function AdminContent() {
     costs,
     sales,
     invoices,
+    employees,
+    salaryPayments,
+    people,
+    loans,
     loading,
     error,
     addProduct,
@@ -62,6 +70,18 @@ function AdminContent() {
     addInvoice,
     updateInvoice,
     deleteInvoice,
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+    addSalaryPayment,
+    updateSalaryPayment,
+    deleteSalaryPayment,
+    addPerson,
+    updatePerson,
+    deletePerson,
+    addLoan,
+    updateLoan,
+    deleteLoan,
   } = useSupabaseData(isAuthenticated)
 
   // Handlers using Supabase
@@ -282,34 +302,63 @@ function AdminContent() {
       {/* Admin Content */}
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue="dashboard" className="space-y-4">
-          <div className="overflow-x-auto -mx-4 px-4">
-            <TabsList className="inline-flex w-full min-w-max md:grid md:grid-cols-5 h-auto gap-1 md:gap-0">
-              <TabsTrigger value="dashboard" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
-                <BarChart3 className="h-3 w-3 md:h-4 md:w-4" />
-                <span>داشبورد</span>
+          <div className="w-full">
+            <TabsList className="w-full h-auto p-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-1 md:gap-2">
+              <TabsTrigger 
+                value="dashboard" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <BarChart3 className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">داشبورد</span>
               </TabsTrigger>
-              <TabsTrigger value="production" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
-                <Factory className="h-3 w-3 md:h-4 md:w-4" />
-                <span>تولید</span>
+              <TabsTrigger 
+                value="production" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <Factory className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">تولید</span>
               </TabsTrigger>
-              <TabsTrigger value="sales-invoices" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
-                <FileText className="h-3 w-3 md:h-4 md:w-4" />
-                <span>فاکتورها</span>
+              <TabsTrigger 
+                value="sales-invoices" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <FileText className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">فاکتورها</span>
               </TabsTrigger>
-              <TabsTrigger value="costs" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
-                <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
-                <span>هزینه‌ها</span>
+              <TabsTrigger 
+                value="costs" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <DollarSign className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">هزینه‌ها</span>
               </TabsTrigger>
-              <TabsTrigger value="products" className="gap-1 md:gap-2 py-2 md:py-3 text-xs md:text-sm whitespace-nowrap flex-shrink-0">
-                <Package className="h-3 w-3 md:h-4 md:w-4" />
-                <span>محصولات</span>
+              <TabsTrigger 
+                value="salaries" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <Users className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">حقوق</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="loans" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <CreditCard className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">قرض و بدهی</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="products" 
+                className="flex flex-col sm:flex-row items-center justify-center gap-1 py-2 px-2 sm:px-3 text-[10px] sm:text-xs md:text-sm whitespace-nowrap h-auto min-h-[60px] sm:min-h-[auto]"
+              >
+                <Package className="h-4 w-4 sm:h-3 sm:w-3 md:h-4 md:w-4 flex-shrink-0" />
+                <span className="text-center">محصولات</span>
               </TabsTrigger>
             </TabsList>
           </div>
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-4">
-            <Dashboard products={products} productions={productions} invoices={invoices} costs={costs} />
+            <Dashboard products={products} productions={productions} invoices={invoices} costs={costs} salaryPayments={salaryPayments} loans={loans} />
           </TabsContent>
 
           {/* Products Tab */}
@@ -337,9 +386,108 @@ function AdminContent() {
             <CostManagement
               products={products}
               costs={costs}
-              invoices={invoices}
               onAdd={handleAddCost}
               onDelete={handleDeleteCost}
+            />
+          </TabsContent>
+
+          {/* Salaries Tab */}
+          <TabsContent value="salaries" className="space-y-4">
+            <SalaryManagement
+              employees={employees}
+              salaryPayments={salaryPayments}
+              onAddEmployee={async (employee) => {
+                try {
+                  await addEmployee(employee)
+                } catch (error) {
+                  alert("خطا در افزودن کارمند: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onUpdateEmployee={async (id, updates) => {
+                try {
+                  await updateEmployee(id, updates)
+                } catch (error) {
+                  alert("خطا در بروزرسانی کارمند: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onDeleteEmployee={async (id) => {
+                try {
+                  await deleteEmployee(id)
+                } catch (error) {
+                  alert("خطا در حذف کارمند: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onAddSalaryPayment={async (payment) => {
+                try {
+                  await addSalaryPayment(payment)
+                } catch (error) {
+                  alert("خطا در ثبت پرداخت حقوق: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onUpdateSalaryPayment={async (id, updates) => {
+                try {
+                  await updateSalaryPayment(id, updates)
+                } catch (error) {
+                  alert("خطا در بروزرسانی پرداخت حقوق: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onDeleteSalaryPayment={async (id) => {
+                try {
+                  await deleteSalaryPayment(id)
+                } catch (error) {
+                  alert("خطا در حذف پرداخت حقوق: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+            />
+          </TabsContent>
+
+          {/* Loans Tab */}
+          <TabsContent value="loans" className="space-y-4">
+            <LoanManagement
+              people={people}
+              loans={loans}
+              onAddPerson={async (person) => {
+                try {
+                  await addPerson(person)
+                } catch (error) {
+                  alert("خطا در افزودن شخص: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onUpdatePerson={async (id, updates) => {
+                try {
+                  await updatePerson(id, updates)
+                } catch (error) {
+                  alert("خطا در بروزرسانی شخص: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onDeletePerson={async (id) => {
+                try {
+                  await deletePerson(id)
+                } catch (error) {
+                  alert("خطا در حذف شخص: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onAddLoan={async (loan) => {
+                try {
+                  await addLoan(loan)
+                } catch (error) {
+                  alert("خطا در ثبت تراکنش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onUpdateLoan={async (id, updates) => {
+                try {
+                  await updateLoan(id, updates)
+                } catch (error) {
+                  alert("خطا در بروزرسانی تراکنش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
+              onDeleteLoan={async (id) => {
+                try {
+                  await deleteLoan(id)
+                } catch (error) {
+                  alert("خطا در حذف تراکنش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                }
+              }}
             />
           </TabsContent>
 

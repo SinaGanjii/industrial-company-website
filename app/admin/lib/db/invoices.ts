@@ -108,6 +108,7 @@ export class InvoicesDB {
           customerName: invoice.customerName,
           customerInfo: invoice.customerInfo,
           subtotal: invoice.subtotal,
+          discount: invoice.discount,
           tax: invoice.tax,
           total: invoice.total,
           date: invoice.date,
@@ -157,6 +158,7 @@ export class InvoicesDB {
       if (updates.customerName !== undefined) updateData.customerName = updates.customerName
       if (updates.customerInfo !== undefined) updateData.customerInfo = updates.customerInfo
       if (updates.subtotal !== undefined) updateData.subtotal = updates.subtotal
+      if (updates.discount !== undefined) updateData.discount = updates.discount
       if (updates.tax !== undefined) updateData.tax = updates.tax
       if (updates.total !== undefined) updateData.total = updates.total
       if (updates.date !== undefined) updateData.date = updates.date

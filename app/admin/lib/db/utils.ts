@@ -1,7 +1,7 @@
 // Database Utility Functions
 // Conversion functions between TypeScript types and Supabase database types
 
-import type { Product, Production, Cost, Sale, Invoice, InvoiceItem } from "../../types"
+import type { Product, Production, Cost, Sale, Invoice, InvoiceItem, Employee, SalaryPayment, Person, Loan } from "../../types"
 import type { Database } from "./types"
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"]
@@ -143,6 +143,11 @@ export function dbInvoiceToTS(row: InvoiceRow, items: InvoiceItem[]): Invoice {
     },
     items: items.map(dbInvoiceItemToTS),
     subtotal: Number(row.subtotal),
+    discount: row.discount 
+      ? Number(row.discount) 
+      : (Number(row.subtotal) > Number(row.total) 
+          ? Number(row.subtotal) - Number(row.total) 
+          : undefined),
     tax: row.tax ? Number(row.tax) : undefined,
     total: Number(row.total),
     date: row.date,
@@ -164,6 +169,7 @@ export function tsInvoiceToDB(invoice: Omit<Invoice, "id" | "createdAt" | "updat
     customer_phone: invoice.customerInfo?.phone || null,
     customer_tax_id: invoice.customerInfo?.taxId || null,
     subtotal: invoice.subtotal,
+    discount: invoice.discount || null,
     tax: invoice.tax || null,
     total: invoice.total,
     date: invoice.date,
@@ -210,6 +216,120 @@ export function tsInvoiceItemToDB(item: InvoiceItem, invoiceId: string): Databas
     quantity: item.quantity,
     unit_price: item.unitPrice,
     total: item.total,
+  }
+}
+
+// Type aliases for Employee, SalaryPayment, Person, and Loan
+type EmployeeRow = Database["public"]["Tables"]["employees"]["Row"]
+type SalaryPaymentRow = Database["public"]["Tables"]["salary_payments"]["Row"]
+type PersonRow = Database["public"]["Tables"]["people"]["Row"]
+type LoanRow = Database["public"]["Tables"]["loans"]["Row"]
+
+// Convert Employee from DB to TypeScript
+export function dbEmployeeToTS(row: EmployeeRow): Employee {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone || undefined,
+    address: row.address || undefined,
+    isActive: row.is_active,
+    notes: row.notes || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+// Convert Employee from TypeScript to DB
+export function tsEmployeeToDB(employee: Omit<Employee, "id" | "createdAt" | "updatedAt">): Database["public"]["Tables"]["employees"]["Insert"] {
+  return {
+    name: employee.name,
+    phone: employee.phone || null,
+    address: employee.address || null,
+    is_active: employee.isActive,
+    notes: employee.notes || null,
+  }
+}
+
+// Convert SalaryPayment from DB to TypeScript
+export function dbSalaryPaymentToTS(row: SalaryPaymentRow): SalaryPayment {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeName: row.employee_name,
+    month: row.month,
+    paymentDate: row.payment_date,
+    dailySalary: Number(row.daily_salary),
+    amount: Number(row.amount),
+    daysWorked: row.days_worked,
+    paymentMethod: row.payment_method,
+    description: row.description || undefined,
+    createdAt: row.created_at,
+  }
+}
+
+// Convert SalaryPayment from TypeScript to DB
+export function tsSalaryPaymentToDB(payment: Omit<SalaryPayment, "id" | "createdAt">): Database["public"]["Tables"]["salary_payments"]["Insert"] {
+  return {
+    employee_id: payment.employeeId,
+    employee_name: payment.employeeName,
+    month: payment.month,
+    payment_date: payment.paymentDate,
+    daily_salary: payment.dailySalary,
+    amount: payment.amount,
+    days_worked: payment.daysWorked,
+    payment_method: payment.paymentMethod,
+    description: payment.description || null,
+  }
+}
+
+// Convert Person from DB to TypeScript
+export function dbPersonToTS(row: PersonRow): Person {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone || undefined,
+    address: row.address || undefined,
+    notes: row.notes || undefined,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+// Convert Person from TypeScript to DB
+export function tsPersonToDB(person: Omit<Person, "id" | "createdAt" | "updatedAt">): Database["public"]["Tables"]["people"]["Insert"] {
+  return {
+    name: person.name,
+    phone: person.phone || null,
+    address: person.address || null,
+    notes: person.notes || null,
+    is_active: person.isActive,
+  }
+}
+
+// Convert Loan from DB to TypeScript
+export function dbLoanToTS(row: LoanRow): Loan {
+  return {
+    id: row.id,
+    personId: row.person_id,
+    personName: row.person_name,
+    transactionType: row.transaction_type,
+    amount: Number(row.amount),
+    transactionDate: row.transaction_date,
+    description: row.description || undefined,
+    createdAt: row.created_at,
+  }
+}
+
+// Convert Loan from TypeScript to DB
+export function tsLoanToDB(loan: Omit<Loan, "id" | "createdAt">): Database["public"]["Tables"]["loans"]["Insert"] {
+  return {
+    person_id: loan.personId,
+    person_name: loan.personName,
+    transaction_type: loan.transactionType,
+    amount: loan.amount,
+    transaction_date: loan.transactionDate,
+    description: loan.description || null,
   }
 }
 

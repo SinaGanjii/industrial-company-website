@@ -31,12 +31,14 @@ export class InvoiceService {
     items: InvoiceItem[],
     invoices: Invoice[],
     customerInfo?: Invoice["customerInfo"],
-    notes?: string
+    notes?: string,
+    discount?: number
   ): Invoice {
     const invoiceNumber = this.generateInvoiceNumber(invoices)
-    const subtotal = items.reduce((sum, item) => sum + item.total, 0)
+    const subtotal = Math.round(items.reduce((sum, item) => sum + item.total, 0))
+    const discountAmount = discount ? Math.round(discount) : 0
     const tax = 0 // No tax - removed as requested
-    const total = subtotal // Total = subtotal (no tax)
+    const total = Math.max(0, Math.round(subtotal - discountAmount)) // Total = subtotal - discount (minimum 0)
 
     // Get today's date in Persian format and convert to Western digits
     const persianDate = getTodayPersianDate()
@@ -50,6 +52,7 @@ export class InvoiceService {
       customerInfo,
       items,
       subtotal,
+      discount: discountAmount > 0 ? discountAmount : undefined,
       tax,
       total,
       date, // Use Western digits format for validation
@@ -127,16 +130,18 @@ export class InvoiceService {
   /**
    * Calculate invoice totals from items
    */
-  static calculateTotals(items: InvoiceItem[], taxRate: number = 0): {
+  static calculateTotals(items: InvoiceItem[], taxRate: number = 0, discount: number = 0): {
     subtotal: number
+    discount: number
     tax: number
     total: number
   } {
-    const subtotal = items.reduce((sum, item) => sum + item.total, 0)
+    const subtotal = Math.round(items.reduce((sum, item) => sum + item.total, 0))
+    const discountAmount = Math.round(discount)
     const tax = 0 // No tax - removed as requested
-    const total = subtotal // Total = subtotal (no tax)
+    const total = Math.max(0, Math.round(subtotal - discountAmount)) // Total = subtotal - discount (minimum 0)
 
-    return { subtotal, tax, total }
+    return { subtotal, discount: discountAmount, tax, total }
   }
 
   /**
@@ -151,8 +156,8 @@ export class InvoiceService {
       productName: product.name,
       dimensions: product.dimensions,
       quantity,
-      unitPrice: product.unitPrice,
-      total: product.unitPrice * quantity,
+      unitPrice: Math.round(product.unitPrice),
+      total: Math.round(product.unitPrice * quantity),
     }
   }
 }

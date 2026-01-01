@@ -6,15 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, X, Zap, Droplets, Flame, Users, DollarSign, Download } from "lucide-react"
-import type { Product, Cost, Invoice } from "../types"
+import { Plus, X, Zap, Droplets, Flame, Users, DollarSign, Download, Home } from "lucide-react"
+import type { Product, Cost } from "../types"
 import { getTodayPersianDate, formatPersianNumber, getCurrentMonthYear } from "../utils"
 import { exportCostsToPDF } from "../utils/exportUtils"
 
 interface CostManagementProps {
   products: Product[]
   costs: Cost[]
-  invoices: Invoice[] // Added to show sales from invoices
   onAdd: (cost: Omit<Cost, "id" | "createdAt">) => void
   onDelete: (id: string) => void
 }
@@ -23,11 +22,11 @@ const COST_TYPES = [
   { value: "electricity", label: "برق", icon: Zap, color: "yellow" },
   { value: "water", label: "آب", icon: Droplets, color: "blue" },
   { value: "gas", label: "گاز", icon: Flame, color: "orange" },
-  { value: "salary", label: "حقوق", icon: Users, color: "purple" },
+  { value: "rent", label: "اجاره", icon: Home, color: "indigo" },
   { value: "other", label: "سایر", icon: DollarSign, color: "gray" },
 ] as const
 
-export function CostManagement({ products, costs, invoices, onAdd, onDelete }: CostManagementProps) {
+export function CostManagement({ products, costs, onAdd, onDelete }: CostManagementProps) {
   const { year, month } = getCurrentMonthYear()
   const today = getTodayPersianDate()
 
@@ -109,7 +108,7 @@ export function CostManagement({ products, costs, invoices, onAdd, onDelete }: C
       typeLabel: costType?.label || formData.type,
       periodType: formData.periodType,
       periodValue: periodValueWestern, // Use converted western digits
-      amount: Number.parseFloat(formData.amount),
+      amount: Math.round(Number.parseFloat(formData.amount)),
       description: formData.description,
     })
 
@@ -143,6 +142,7 @@ export function CostManagement({ products, costs, invoices, onAdd, onDelete }: C
       blue: "bg-blue-500/10 text-blue-600",
       orange: "bg-orange-500/10 text-orange-600",
       purple: "bg-purple-500/10 text-purple-600",
+      indigo: "bg-indigo-500/10 text-indigo-600",
       gray: "bg-gray-500/10 text-gray-600",
     }
     return colorMap[color] || colorMap.gray
@@ -319,61 +319,6 @@ export function CostManagement({ products, costs, invoices, onAdd, onDelete }: C
                       >
                         <X className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </div>
-                ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sales from Invoices List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>فروشات از فاکتورها ({invoices.filter(inv => inv.status === "paid").length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {invoices.filter(inv => inv.status === "paid").length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">فاکتور پرداخت شده‌ای وجود ندارد</p>
-            ) : (
-              invoices
-                .filter(inv => inv.status === "paid")
-                .sort((a, b) => {
-                  const aDate = a.paidDate || a.date
-                  const bDate = b.paidDate || b.date
-                  return bDate.localeCompare(aDate)
-                })
-                .map((invoice) => (
-                  <div
-                    key={invoice.id}
-                    className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-600">
-                            {invoice.invoiceNumber}
-                          </span>
-                          <h4 className="font-semibold text-foreground">{invoice.customerName}</h4>
-                        </div>
-                        <div className="text-sm text-muted-foreground mb-2">
-                          تاریخ پرداخت: {invoice.paidDate || invoice.date}
-                        </div>
-                        <div className="space-y-1">
-                          {invoice.items.map((item, idx) => (
-                            <div key={idx} className="text-xs text-muted-foreground">
-                              • {item.productName} ({item.dimensions}) - {formatPersianNumber(item.quantity)} عدد × {formatPersianNumber(item.unitPrice)} = {formatPersianNumber(item.total)} تومان
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-green-600">
-                          {formatPersianNumber(invoice.total)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">تومان</div>
-                      </div>
                     </div>
                   </div>
                 ))

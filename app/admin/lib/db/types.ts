@@ -65,7 +65,7 @@ export interface Database {
       costs: {
         Row: {
           id: string
-          type: "electricity" | "water" | "gas" | "salary" | "other"
+          type: "electricity" | "water" | "gas" | "salary" | "rent" | "other"
           type_label: string
           amount: number
           period_type: "daily" | "monthly" | "yearly"
@@ -78,7 +78,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          type: "electricity" | "water" | "gas" | "salary" | "other"
+          type: "electricity" | "water" | "gas" | "salary" | "rent" | "other"
           type_label: string
           amount: number
           period_type: "daily" | "monthly" | "yearly"
@@ -91,7 +91,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          type?: "electricity" | "water" | "gas" | "salary" | "other"
+          type?: "electricity" | "water" | "gas" | "salary" | "rent" | "other"
           type_label?: string
           amount?: number
           period_type?: "daily" | "monthly" | "yearly"
@@ -151,6 +151,7 @@ export interface Database {
           customer_phone: string | null
           customer_tax_id: string | null
           subtotal: number
+          discount: number | null
           tax: number | null
           total: number
           date: string
@@ -169,6 +170,7 @@ export interface Database {
           customer_phone?: string | null
           customer_tax_id?: string | null
           subtotal: number
+          discount?: number | null
           tax?: number | null
           total: number
           date: string
@@ -187,6 +189,7 @@ export interface Database {
           customer_phone?: string | null
           customer_tax_id?: string | null
           subtotal?: number
+          discount?: number | null
           tax?: number | null
           total?: number
           date?: string
@@ -231,6 +234,143 @@ export interface Database {
           total?: number
           created_at?: string
         }
+      }
+    }
+    employees: {
+      Row: {
+        id: string
+        name: string
+        phone: string | null
+        address: string | null
+        is_active: boolean
+        notes: string | null
+        created_at: string
+        updated_at: string
+      }
+      Insert: {
+        id?: string
+        name: string
+        phone?: string | null
+        address?: string | null
+        is_active?: boolean
+        notes?: string | null
+        created_at?: string
+        updated_at?: string
+      }
+      Update: {
+        id?: string
+        name?: string
+        phone?: string | null
+        address?: string | null
+        is_active?: boolean
+        notes?: string | null
+        created_at?: string
+        updated_at?: string
+      }
+    }
+    salary_payments: {
+      Row: {
+        id: string
+        employee_id: string
+        employee_name: string
+        month: string
+        payment_date: string
+        daily_salary: number
+        amount: number
+        days_worked: number
+        payment_method: "cash" | "transfer" | "check"
+        description: string | null
+        created_at: string
+      }
+      Insert: {
+        id?: string
+        employee_id: string
+        employee_name: string
+        month: string
+        payment_date: string
+        daily_salary: number
+        amount: number
+        days_worked: number
+        payment_method: "cash" | "transfer" | "check"
+        description?: string | null
+        created_at?: string
+      }
+      Update: {
+        id?: string
+        employee_id?: string
+        employee_name?: string
+        month?: string
+        payment_date?: string
+        daily_salary?: number
+        amount?: number
+        days_worked?: number
+        payment_method?: "cash" | "transfer" | "check"
+        description?: string | null
+        created_at?: string
+      }
+    }
+    people: {
+      Row: {
+        id: string
+        name: string
+        phone: string | null
+        address: string | null
+        notes: string | null
+        is_active: boolean
+        created_at: string
+        updated_at: string
+      }
+      Insert: {
+        id?: string
+        name: string
+        phone?: string | null
+        address?: string | null
+        notes?: string | null
+        is_active?: boolean
+        created_at?: string
+        updated_at?: string
+      }
+      Update: {
+        id?: string
+        name?: string
+        phone?: string | null
+        address?: string | null
+        notes?: string | null
+        is_active?: boolean
+        created_at?: string
+        updated_at?: string
+      }
+    }
+    loans: {
+      Row: {
+        id: string
+        person_id: string
+        person_name: string
+        transaction_type: "lend" | "borrow"
+        amount: number
+        transaction_date: string
+        description: string | null
+        created_at: string
+      }
+      Insert: {
+        id?: string
+        person_id: string
+        person_name: string
+        transaction_type: "lend" | "borrow"
+        amount: number
+        transaction_date: string
+        description?: string | null
+        created_at?: string
+      }
+      Update: {
+        id?: string
+        person_id?: string
+        person_name?: string
+        transaction_type?: "lend" | "borrow"
+        amount?: number
+        transaction_date?: string
+        description?: string | null
+        created_at?: string
       }
     }
   }

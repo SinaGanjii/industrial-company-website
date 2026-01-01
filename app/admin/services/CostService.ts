@@ -151,7 +151,14 @@ export class CostService {
       byType.set(cost.type, current + cost.amount)
     }
 
-    return { total, byType }
+    // Round all values to integers
+    const roundedTotal = Math.round(total)
+    const roundedByType = new Map<string, number>()
+    for (const [type, amount] of byType) {
+      roundedByType.set(type, Math.round(amount))
+    }
+
+    return { total: roundedTotal, byType: roundedByType }
   }
 
   /**
@@ -182,7 +189,7 @@ export class CostService {
     // Allocate costs proportionally
     for (const [productId, productQty] of productionByProduct) {
       const allocatedCost = totalCost * (productQty / totalProduction)
-      allocation.set(productId, allocatedCost)
+      allocation.set(productId, Math.round(allocatedCost))
     }
 
     return allocation

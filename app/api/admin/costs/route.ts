@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     
     // Create a more flexible schema that matches what the client sends
     const flexibleCostSchema = z.object({
-      type: z.enum(["electricity", "water", "gas", "salary", "other"]),
+      type: z.enum(["electricity", "water", "gas", "salary", "rent", "other"]),
       typeLabel: z.string().optional(),
       amount: z.number().min(0),
       periodType: z.enum(["daily", "monthly", "yearly"]),
@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       water: "آب",
       gas: "گاز",
       salary: "حقوق",
+      rent: "اجاره",
       other: "سایر",
     }
     

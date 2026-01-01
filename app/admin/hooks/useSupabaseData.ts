@@ -4,7 +4,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import type { Product, Production, Cost, Sale, Invoice } from "../types"
+import type { Product, Production, Cost, Sale, Invoice, Employee, SalaryPayment, Person, Loan } from "../types"
 import {
   ProductsDB,
   ProductionsDB,
@@ -12,6 +12,10 @@ import {
   SalesDB,
   InvoicesDB,
 } from "../lib/db"
+import { EmployeesDB } from "../lib/db/employees"
+import { SalaryPaymentsDB } from "../lib/db/salary_payments"
+import { PeopleDB } from "../lib/db/people"
+import { LoansDB } from "../lib/db/loans"
 
 export function useSupabaseData(isAuthenticated: boolean = false) {
   const [products, setProducts] = useState<Product[]>([])
@@ -19,6 +23,10 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
   const [costs, setCosts] = useState<Cost[]>([])
   const [sales, setSales] = useState<Sale[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([])
+  const [people, setPeople] = useState<Person[]>([])
+  const [loans, setLoans] = useState<Loan[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,13 +41,17 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
       setLoading(true)
       setError(null)
 
-      const [productsData, productionsData, costsData, salesData, invoicesData] =
+      const [productsData, productionsData, costsData, salesData, invoicesData, employeesData, salaryPaymentsData, peopleData, loansData] =
         await Promise.all([
           ProductsDB.getAll(),
           ProductionsDB.getAll(),
           CostsDB.getAll(),
           SalesDB.getAll(),
           InvoicesDB.getAll(),
+          EmployeesDB.getAll(),
+          SalaryPaymentsDB.getAll(),
+          PeopleDB.getAll(),
+          LoansDB.getAll(),
         ])
 
       setProducts(productsData)
@@ -47,6 +59,10 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
       setCosts(costsData)
       setSales(salesData)
       setInvoices(invoicesData)
+      setEmployees(employeesData)
+      setSalaryPayments(salaryPaymentsData)
+      setPeople(peopleData)
+      setLoans(loansData)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch data"
       setError(errorMessage)
@@ -70,6 +86,10 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
       setCosts([])
       setSales([])
       setInvoices([])
+      setEmployees([])
+      setSalaryPayments([])
+      setPeople([])
+      setLoans([])
       setError(null)
       setLoading(false)
     }
@@ -234,6 +254,174 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
     }
   }, [])
 
+  // Employees operations
+  const addEmployee = useCallback(
+    async (employee: Omit<Employee, "id" | "createdAt" | "updatedAt">) => {
+      try {
+        const newEmployee = await EmployeesDB.create(employee)
+        setEmployees((prev) => [newEmployee, ...prev])
+        return newEmployee
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to create employee"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const updateEmployee = useCallback(
+    async (id: string, updates: Partial<Omit<Employee, "id" | "createdAt" | "updatedAt">>) => {
+      try {
+        const updatedEmployee = await EmployeesDB.update(id, updates)
+        setEmployees((prev) => prev.map((e) => (e.id === id ? updatedEmployee : e)))
+        return updatedEmployee
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update employee"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const deleteEmployee = useCallback(async (id: string) => {
+    try {
+      await EmployeesDB.delete(id)
+      setEmployees((prev) => prev.filter((e) => e.id !== id))
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete employee"
+      setError(errorMessage)
+      throw err
+    }
+  }, [])
+
+  // Salary Payments operations
+  const addSalaryPayment = useCallback(
+    async (payment: Omit<SalaryPayment, "id" | "createdAt">) => {
+      try {
+        const newPayment = await SalaryPaymentsDB.create(payment)
+        setSalaryPayments((prev) => [newPayment, ...prev])
+        return newPayment
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to create salary payment"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const updateSalaryPayment = useCallback(
+    async (id: string, updates: Partial<Omit<SalaryPayment, "id" | "createdAt">>) => {
+      try {
+        const updatedPayment = await SalaryPaymentsDB.update(id, updates)
+        setSalaryPayments((prev) => prev.map((p) => (p.id === id ? updatedPayment : p)))
+        return updatedPayment
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update salary payment"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const deleteSalaryPayment = useCallback(async (id: string) => {
+    try {
+      await SalaryPaymentsDB.delete(id)
+      setSalaryPayments((prev) => prev.filter((p) => p.id !== id))
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete salary payment"
+      setError(errorMessage)
+      throw err
+    }
+  }, [])
+
+  // People operations
+  const addPerson = useCallback(
+    async (person: Omit<Person, "id" | "createdAt" | "updatedAt">) => {
+      try {
+        const newPerson = await PeopleDB.create(person)
+        setPeople((prev) => [newPerson, ...prev])
+        return newPerson
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to create person"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const updatePerson = useCallback(
+    async (id: string, updates: Partial<Omit<Person, "id" | "createdAt" | "updatedAt">>) => {
+      try {
+        const updatedPerson = await PeopleDB.update(id, updates)
+        setPeople((prev) => prev.map((p) => (p.id === id ? updatedPerson : p)))
+        return updatedPerson
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update person"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const deletePerson = useCallback(async (id: string) => {
+    try {
+      await PeopleDB.delete(id)
+      setPeople((prev) => prev.filter((p) => p.id !== id))
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete person"
+      setError(errorMessage)
+      throw err
+    }
+  }, [])
+
+  // Loans operations
+  const addLoan = useCallback(
+    async (loan: Omit<Loan, "id" | "createdAt">) => {
+      try {
+        const newLoan = await LoansDB.create(loan)
+        setLoans((prev) => [newLoan, ...prev])
+        return newLoan
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to create loan"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const updateLoan = useCallback(
+    async (id: string, updates: Partial<Omit<Loan, "id" | "createdAt">>) => {
+      try {
+        const updatedLoan = await LoansDB.update(id, updates)
+        setLoans((prev) => prev.map((l) => (l.id === id ? updatedLoan : l)))
+        return updatedLoan
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update loan"
+        setError(errorMessage)
+        throw err
+      }
+    },
+    []
+  )
+
+  const deleteLoan = useCallback(async (id: string) => {
+    try {
+      await LoansDB.delete(id)
+      setLoans((prev) => prev.filter((l) => l.id !== id))
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete loan"
+      setError(errorMessage)
+      throw err
+    }
+  }, [])
+
   return {
     // Data
     products,
@@ -241,6 +429,10 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
     costs,
     sales,
     invoices,
+    employees,
+    salaryPayments,
+    people,
+    loans,
     // Loading state
     loading,
     error,
@@ -267,6 +459,26 @@ export function useSupabaseData(isAuthenticated: boolean = false) {
     updateInvoice,
     deleteInvoice,
     setInvoices,
+    // Employees
+    addEmployee,
+    updateEmployee,
+    deleteEmployee,
+    setEmployees,
+    // Salary Payments
+    addSalaryPayment,
+    updateSalaryPayment,
+    deleteSalaryPayment,
+    setSalaryPayments,
+    // People
+    addPerson,
+    updatePerson,
+    deletePerson,
+    setPeople,
+    // Loans
+    addLoan,
+    updateLoan,
+    deleteLoan,
+    setLoans,
   }
 }
 

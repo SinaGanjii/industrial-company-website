@@ -5,18 +5,45 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Factory, TrendingUp, TrendingDown, DollarSign, Download, Package } from "lucide-react"
-import type { Product, Production, Invoice, Cost } from "../types"
+import { Factory, TrendingUp, TrendingDown, DollarSign, Download, Package, CreditCard } from "lucide-react"
+import type { Product, Production, Invoice, Cost, SalaryPayment, Loan } from "../types"
 import { StockService } from "../services/StockService"
 import { CostService } from "../services/CostService"
-import { formatPersianNumber, convertToWesternDigits } from "../utils"
+import { SalaryService } from "../services/SalaryService"
+import { LoanService } from "../services/LoanService"
+import { formatPersianNumber, convertToWesternDigits, getCurrentMonthYear } from "../utils"
 import { exportDashboardToPDF } from "../utils/exportUtils"
+
+/**
+ * Get the first and last day of the current month in Persian calendar
+ */
+function getCurrentMonthDateRange(): { startDate: string; endDate: string } {
+  const { year, month } = getCurrentMonthYear()
+  const startDate = `${year}/${month}/01`
+  
+  // Persian calendar: months 1-6 have 31 days, 7-11 have 30 days, 12 has 29/30
+  // For simplicity, we'll use 30 for month 12 (can be adjusted for leap years)
+  const monthNum = Number.parseInt(month, 10)
+  let daysInMonth = 31
+  if (monthNum >= 7 && monthNum <= 11) {
+    daysInMonth = 30
+  } else if (monthNum === 12) {
+    // Month 12 (Esfand) - use 30 as default (29 in leap years)
+    daysInMonth = 30
+  }
+  
+  const endDate = `${year}/${month}/${daysInMonth.toString().padStart(2, "0")}`
+  
+  return { startDate, endDate }
+}
 
 interface DashboardProps {
   products: Product[]
   productions: Production[]
   invoices: Invoice[]
   costs: Cost[]
+  salaryPayments: SalaryPayment[]
+  loans: Loan[]
 }
 
 /**
@@ -37,9 +64,15 @@ interface DashboardProps {
  * 5. Current Stock (GLOBAL, not filtered):
  *    stock = total_production_all_time - total_sales_all_time (from paid invoices)
  */
-export function Dashboard({ products, productions, invoices, costs }: DashboardProps) {
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
+export function Dashboard({ products, productions, invoices, costs, salaryPayments, loans }: DashboardProps) {
+  // Initialize with current month's date range
+  const getInitialDates = () => {
+    const { startDate, endDate } = getCurrentMonthDateRange()
+    return { startDate, endDate }
+  }
+  
+  const [startDate, setStartDate] = useState(() => getInitialDates().startDate)
+  const [endDate, setEndDate] = useState(() => getInitialDates().endDate)
 
   // Filter data by date range
   const getFilteredData = () => {
@@ -70,29 +103,40 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
     // Filter costs using CostService
     const filteredCosts = CostService.collectCostsForPeriod(normalizedStart, normalizedEnd, costs)
 
+    // Calculate salary costs for the period
+    const salaryCosts = SalaryService.getTotalSalaryCostsForPeriod(normalizedStart, normalizedEnd, salaryPayments)
+
     return {
       filteredProductions,
       filteredInvoices,
       filteredCosts,
+      salaryCosts,
     }
   }
 
-  const { filteredProductions, filteredInvoices, filteredCosts } = getFilteredData()
+  const { filteredProductions, filteredInvoices, filteredCosts, salaryCosts } = getFilteredData()
 
-  // Calculate KPIs
-  const totalProduction = filteredProductions.reduce((sum, p) => sum + p.quantity, 0)
-  const totalSalesRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0)
-  const totalCosts = filteredCosts.reduce((sum, c) => sum + c.amount, 0)
-  const netProfit = totalSalesRevenue - totalCosts
+  // Calculate KPIs (all values as integers)
+  const totalProduction = Math.round(filteredProductions.reduce((sum, p) => sum + p.quantity, 0))
+  const totalSalesRevenue = Math.round(filteredInvoices.reduce((sum, inv) => sum + inv.total, 0))
+  const totalCosts = Math.round(filteredCosts.reduce((sum, c) => sum + c.amount, 0) + (salaryCosts || 0))
+  const netProfit = Math.round(totalSalesRevenue - totalCosts)
 
-  // Cost breakdown by type
+  // Cost breakdown by type (all values as integers)
+  // Note: Salaries are now managed separately, but we still show them in the breakdown
   const costBreakdown = {
-    electricity: filteredCosts.filter((c) => c.type === "electricity").reduce((sum, c) => sum + c.amount, 0),
-    water: filteredCosts.filter((c) => c.type === "water").reduce((sum, c) => sum + c.amount, 0),
-    gas: filteredCosts.filter((c) => c.type === "gas").reduce((sum, c) => sum + c.amount, 0),
-    salary: filteredCosts.filter((c) => c.type === "salary").reduce((sum, c) => sum + c.amount, 0),
-    other: filteredCosts.filter((c) => c.type === "other").reduce((sum, c) => sum + c.amount, 0),
+    electricity: Math.round(filteredCosts.filter((c) => c.type === "electricity").reduce((sum, c) => sum + c.amount, 0)),
+    water: Math.round(filteredCosts.filter((c) => c.type === "water").reduce((sum, c) => sum + c.amount, 0)),
+    gas: Math.round(filteredCosts.filter((c) => c.type === "gas").reduce((sum, c) => sum + c.amount, 0)),
+    salary: salaryCosts || 0, // From salary payments
+    rent: Math.round(filteredCosts.filter((c) => c.type === "rent").reduce((sum, c) => sum + c.amount, 0)),
+    other: Math.round(filteredCosts.filter((c) => c.type === "other").reduce((sum, c) => sum + c.amount, 0)),
   }
+
+  // Loan calculations
+  const totalLoanBalance = LoanService.calculateTotalBalance(loans)
+  const totalLent = LoanService.getTotalLent(loans)
+  const totalBorrowed = LoanService.getTotalBorrowed(loans)
 
   // Current stock (GLOBAL - all time, from paid invoices only)
   const stocks = StockService.calculateAllStocks(products, productions, invoices)
@@ -212,7 +256,7 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
       </Card>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Production */}
         <Card className="border-accent/20">
           <CardContent className="p-4">
@@ -276,6 +320,43 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
             <div className="text-xs text-muted-foreground">سود خالص (تومان)</div>
           </CardContent>
         </Card>
+
+        {/* Loan Balance */}
+        <Card className="border-purple-600/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-purple-600" />
+              </div>
+              {totalLoanBalance > 0 ? (
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              ) : totalLoanBalance < 0 ? (
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              ) : null}
+            </div>
+            <div
+              className={`text-2xl font-bold mb-1 ${
+                totalLoanBalance > 0
+                  ? "text-green-600"
+                  : totalLoanBalance < 0
+                    ? "text-red-600"
+                    : "text-foreground"
+              }`}
+            >
+              {formatPersianNumber(Math.abs(totalLoanBalance))}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {totalLoanBalance > 0
+                ? "موجودی کل (به ما بدهکارند)"
+                : totalLoanBalance < 0
+                  ? "موجودی کل (ما بدهکاریم)"
+                  : "موجودی کل (صفر)"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              قرض داده: {formatPersianNumber(totalLent)} | قرض گرفته: {formatPersianNumber(totalBorrowed)}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Current Stock (Global) */}
@@ -313,7 +394,7 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
         <Card>
           <CardContent className="p-4">
             <h3 className="font-semibold mb-4">تفکیک هزینه‌ها</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {costBreakdown.electricity > 0 && (
                 <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                   <div className="text-sm font-medium mb-1">برق</div>
@@ -343,6 +424,14 @@ export function Dashboard({ products, productions, invoices, costs }: DashboardP
                   <div className="text-sm font-medium mb-1">حقوق</div>
                   <div className="text-lg font-bold text-purple-600">
                     {formatPersianNumber(costBreakdown.salary)}
+                  </div>
+                </div>
+              )}
+              {costBreakdown.rent > 0 && (
+                <div className="p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                  <div className="text-sm font-medium mb-1">اجاره</div>
+                  <div className="text-lg font-bold text-indigo-600">
+                    {formatPersianNumber(costBreakdown.rent)}
                   </div>
                 </div>
               )}

@@ -28,12 +28,12 @@ export class ReportService {
     // Collect costs for this day using period-based logic
     const dayCosts = CostService.getCostsForDay(date, costs)
 
-    const productionTotal = dayProductions.reduce((sum, p) => sum + p.quantity, 0)
-    const salesTotal = daySales.reduce((sum, s) => sum + s.totalPrice, 0)
-    const salesQuantity = daySales.reduce((sum, s) => sum + s.quantity, 0)
+    const productionTotal = Math.round(dayProductions.reduce((sum, p) => sum + p.quantity, 0))
+    const salesTotal = Math.round(daySales.reduce((sum, s) => sum + s.totalPrice, 0))
+    const salesQuantity = Math.round(daySales.reduce((sum, s) => sum + s.quantity, 0))
     
     const { total: expensesTotal } = CostService.calculateTotalCostsByType(dayCosts)
-    const profit = salesTotal - expensesTotal
+    const profit = Math.round(salesTotal - expensesTotal)
 
     return {
       date,
@@ -82,9 +82,9 @@ export class ReportService {
     // Collect costs for this month using period-based logic
     const monthCosts = CostService.getCostsForMonth(year, month, costs)
 
-    const productionTotal = monthProductions.reduce((sum, p) => sum + p.quantity, 0)
-    const salesTotal = monthSales.reduce((sum, s) => sum + s.totalPrice, 0)
-    const salesQuantity = monthSales.reduce((sum, s) => sum + s.quantity, 0)
+    const productionTotal = Math.round(monthProductions.reduce((sum, p) => sum + p.quantity, 0))
+    const salesTotal = Math.round(monthSales.reduce((sum, s) => sum + s.totalPrice, 0))
+    const salesQuantity = Math.round(monthSales.reduce((sum, s) => sum + s.quantity, 0))
     
     const { total: costsTotal, byType: costsByTypeMap } = CostService.calculateTotalCostsByType(monthCosts)
     
