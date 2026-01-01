@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, X, Zap, Droplets, Flame, Users, DollarSign } from "lucide-react"
 import type { Product, Cost } from "../types"
-import { getTodayPersianDate, formatPersianNumber } from "../utils"
+import { getTodayPersianDate, formatPersianNumber, getCurrentMonthYear } from "../utils"
 
 interface CostManagementProps {
   products: Product[]
@@ -26,20 +26,78 @@ const COST_TYPES = [
 ] as const
 
 export function CostManagement({ products, costs, onAdd, onDelete }: CostManagementProps) {
+  const { year, month } = getCurrentMonthYear()
+  const today = getTodayPersianDate()
+
   const [formData, setFormData] = useState({
     type: "electricity" as Cost["type"],
     amount: "",
-    date: getTodayPersianDate(),
+    periodType: "daily" as Cost["periodType"],
+    periodValue: today, // Default to today for daily
     description: "",
-    productId: "none",
-    productionDate: "",
   })
+
+  // Update period value based on period type
+  const handlePeriodTypeChange = (newPeriodType: Cost["periodType"]) => {
+    let newPeriodValue = ""
+    
+    if (newPeriodType === "daily") {
+      newPeriodValue = today
+    } else if (newPeriodType === "monthly") {
+      newPeriodValue = `${year}/${month}`
+    }
+
+    setFormData({
+      ...formData,
+      periodType: newPeriodType,
+      periodValue: newPeriodValue,
+    })
+  }
+
+  // Convert Persian/Arabic digits to Western digits for validation
+  const convertToWesternDigits = (str: string): string => {
+    const persianDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
+    const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+    const westernDigits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    
+    let result = str
+    for (let i = 0; i < 10; i++) {
+      result = result.replace(new RegExp(persianDigits[i], "g"), westernDigits[i])
+      result = result.replace(new RegExp(arabicDigits[i], "g"), westernDigits[i])
+    }
+    return result
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.amount || !formData.date || !formData.description) {
+    if (!formData.amount || !formData.periodValue || !formData.description) {
       alert("لطفاً تمام فیلدهای الزامی را پر کنید")
       return
+    }
+
+    // Convert to western digits for validation
+    const periodValueWestern = convertToWesternDigits(formData.periodValue)
+
+    // Validate period value format (accept both Persian and Western digits)
+    if (formData.periodType === "daily") {
+      const dailyPattern = /^[۰-۹0-9]{4}\/[۰-۹0-9]{2}\/[۰-۹0-9]{2}$/
+      if (!dailyPattern.test(formData.periodValue) && !/^\d{4}\/\d{2}\/\d{2}$/.test(periodValueWestern)) {
+        alert("فرمت تاریخ نامعتبر است. باید به صورت YYYY/MM/DD باشد")
+        return
+      }
+    }
+    if (formData.periodType === "monthly") {
+      const monthlyPattern = /^[۰-۹0-9]{4}\/[۰-۹0-9]{2}$/
+      if (!monthlyPattern.test(formData.periodValue) && !/^\d{4}\/\d{2}$/.test(periodValueWestern)) {
+        alert("فرمت ماه نامعتبر است. باید به صورت YYYY/MM باشد")
+        return
+      }
+    }
+
+    // Convert periodValue to western digits before saving
+    const costToAdd = {
+      ...formData,
+      periodValue: periodValueWestern, // Save in western digits format
     }
 
     const costType = COST_TYPES.find((ct) => ct.value === formData.type)
@@ -47,20 +105,19 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
     onAdd({
       type: formData.type,
       typeLabel: costType?.label || formData.type,
+      periodType: formData.periodType,
+      periodValue: periodValueWestern, // Use converted western digits
       amount: Number.parseFloat(formData.amount),
-      date: formData.date,
       description: formData.description,
-      productId: formData.productId && formData.productId !== "none" ? formData.productId : undefined,
-      productionDate: formData.productionDate || undefined,
     })
 
+    // Reset form
     setFormData({
       type: "electricity",
       amount: "",
-      date: getTodayPersianDate(),
+      periodType: "daily",
+      periodValue: today,
       description: "",
-      productId: "none",
-      productionDate: "",
     })
   }
 
@@ -87,6 +144,15 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
       gray: "bg-gray-500/10 text-gray-600",
     }
     return colorMap[color] || colorMap.gray
+  }
+
+  const getPeriodLabel = (cost: Cost): string => {
+    if (cost.periodType === "daily") {
+      return `روزانه: ${cost.periodValue}`
+    } else if (cost.periodType === "monthly") {
+      return `ماهانه: ${cost.periodValue}`
+    }
+    return cost.periodValue
   }
 
   return (
@@ -129,14 +195,39 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
                 />
               </div>
               <div className="space-y-2">
-                <Label>تاریخ *</Label>
-                <Input
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  placeholder="۱۴۰۳/۱۰/۱۵"
-                  required
-                />
+                <Label>نوع دوره *</Label>
+                <Select
+                  value={formData.periodType}
+                  onValueChange={handlePeriodTypeChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">روزانه</SelectItem>
+                    <SelectItem value="monthly">ماهانه</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>
+                {formData.periodType === "daily" && "تاریخ (YYYY/MM/DD) *"}
+                {formData.periodType === "monthly" && "ماه (YYYY/MM) *"}
+              </Label>
+              <Input
+                value={formData.periodValue}
+                onChange={(e) => setFormData({ ...formData, periodValue: e.target.value })}
+                placeholder={
+                  formData.periodType === "daily" ? "۱۴۰۵/۱۰/۱۵" :
+                  "۱۴۰۵/۱۰"
+                }
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                {formData.periodType === "daily" && "فرمت: YYYY/MM/DD (مثال: ۱۴۰۵/۱۰/۱۵)"}
+                {formData.periodType === "monthly" && "فرمت: YYYY/MM (مثال: ۱۴۰۵/۱۰)"}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>شرح *</Label>
@@ -146,35 +237,6 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
                 placeholder="توضیحات هزینه"
                 required
               />
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>لینک به محصول (اختیاری)</Label>
-                <Select
-                  value={formData.productId}
-                  onValueChange={(value) => setFormData({ ...formData, productId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="انتخاب محصول (اختیاری)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">بدون لینک</SelectItem>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>لینک به تاریخ تولید (اختیاری)</Label>
-                <Input
-                  value={formData.productionDate}
-                  onChange={(e) => setFormData({ ...formData, productionDate: e.target.value })}
-                  placeholder="۱۴۰۳/۱۰/۱۵"
-                />
-              </div>
             </div>
             <Button type="submit">
               <Plus className="h-4 w-4 mr-2" />
@@ -195,7 +257,12 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
               <p className="text-center text-muted-foreground py-8">هزینه‌ای ثبت نشده است</p>
             ) : (
               costs
-                .sort((a, b) => b.date.localeCompare(a.date))
+                .sort((a, b) => {
+                  // Sort by period value, then by type
+                  const periodCompare = b.periodValue.localeCompare(a.periodValue)
+                  if (periodCompare !== 0) return periodCompare
+                  return b.type.localeCompare(a.type)
+                })
                 .map((cost) => (
                   <div
                     key={cost.id}
@@ -212,12 +279,7 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
                         <h4 className="font-semibold text-foreground">{cost.description}</h4>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>تاریخ: {cost.date}</span>
-                        {cost.productId && (
-                          <span>
-                            محصول: {products.find((p) => p.id === cost.productId)?.name}
-                          </span>
-                        )}
+                        <span>{getPeriodLabel(cost)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -244,4 +306,3 @@ export function CostManagement({ products, costs, onAdd, onDelete }: CostManagem
     </div>
   )
 }
-

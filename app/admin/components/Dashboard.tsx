@@ -4,14 +4,13 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Factory, TrendingUp, TrendingDown, Package, DollarSign, Zap, Droplets, Flame, Users, Wallet, Download, Calendar } from "lucide-react"
+import { Factory, TrendingUp, TrendingDown, DollarSign, Download, Package } from "lucide-react"
 import type { Product, Production, Sale, Cost } from "../types"
 import { StockService } from "../services/StockService"
-import { ReportService } from "../services/ReportService"
-import { exportReportToExcel } from "../utils/exportUtils"
-import { getTodayPersianDate, getCurrentMonthYear, formatPersianNumber } from "../utils"
+import { CostService } from "../services/CostService"
+import { formatPersianNumber, convertToWesternDigits } from "../utils"
+import { exportDashboardToExcel } from "../utils/exportUtils"
 
 interface DashboardProps {
   products: Product[]
@@ -20,210 +19,176 @@ interface DashboardProps {
   costs: Cost[]
 }
 
+/**
+ * Dashboard Calculations (for selected date range):
+ * 
+ * 1. Total Production = sum(production.quantity) where production.date is in [startDate, endDate]
+ * 
+ * 2. Total Sales Revenue = sum(sale.totalPrice) where sale.date is in [startDate, endDate]
+ * 
+ * 3. Total Costs = sum(cost.amount) where:
+ *    - If cost.periodType === "daily": cost.periodValue (date) is in [startDate, endDate]
+ *    - If cost.periodType === "monthly": cost.periodValue (YYYY/MM) month overlaps with range
+ * 
+ * 4. Net Profit = Total Sales Revenue - Total Costs
+ * 
+ * 5. Current Stock (GLOBAL, not filtered):
+ *    stock = total_production_all_time - total_sales_all_time
+ */
 export function Dashboard({ products, productions, sales, costs }: DashboardProps) {
-  const [periodType, setPeriodType] = useState<"daily" | "weekly" | "monthly" | "yearly">("daily")
-  const [selectedDate, setSelectedDate] = useState(getTodayPersianDate())
-  const { month, year } = getCurrentMonthYear()
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
 
-  // Calculate data based on period
-  const getPeriodData = () => {
-    switch (periodType) {
-      case "daily": {
-        const dayProductions = productions.filter((p) => p.date === selectedDate)
-        const daySales = sales.filter((s) => s.date === selectedDate)
-        const dayCosts = costs.filter((c) => c.date === selectedDate)
-        
-        return {
-          productionQty: dayProductions.reduce((sum, p) => sum + p.quantity, 0),
-          salesAmount: daySales.reduce((sum, s) => sum + s.totalPrice, 0),
-          salesQty: daySales.reduce((sum, s) => sum + s.quantity, 0),
-          expenses: dayCosts.reduce((sum, c) => sum + c.amount, 0),
-          costs: dayCosts,
-          periodLabel: `روز ${selectedDate}`,
-        }
+  // Filter data by date range
+  const getFilteredData = () => {
+    if (!startDate || !endDate) {
+      return {
+        filteredProductions: [],
+        filteredSales: [],
+        filteredCosts: [],
       }
-      case "weekly": {
-        // Get all dates and sort them, take last 7 days
-        const allDates = [...new Set([
-          ...productions.map(p => p.date),
-          ...sales.map(s => s.date),
-          ...costs.map(c => c.date)
-        ])].sort()
-        
-        const last7Days = allDates.slice(-7)
-        
-        const weekProductions = productions.filter((p) => last7Days.includes(p.date))
-        const weekSales = sales.filter((s) => last7Days.includes(s.date))
-        const weekCosts = costs.filter((c) => last7Days.includes(c.date))
-        
-        return {
-          productionQty: weekProductions.reduce((sum, p) => sum + p.quantity, 0),
-          salesAmount: weekSales.reduce((sum, s) => sum + s.totalPrice, 0),
-          salesQty: weekSales.reduce((sum, s) => sum + s.quantity, 0),
-          expenses: weekCosts.reduce((sum, c) => sum + c.amount, 0),
-          costs: weekCosts,
-          periodLabel: `هفته گذشته (${last7Days.length} روز)`,
-        }
-      }
-      case "monthly": {
-        const monthProductions = productions.filter((p) => {
-          const [pYear, pMonth] = p.date.split("/")
-          return pYear === year && pMonth === month
-        })
-        const monthSales = sales.filter((s) => {
-          const [sYear, sMonth] = s.date.split("/")
-          return sYear === year && sMonth === month
-        })
-        const monthCosts = costs.filter((c) => {
-          const [cYear, cMonth] = c.date.split("/")
-          return cYear === year && cMonth === month
-        })
-        
-        return {
-          productionQty: monthProductions.reduce((sum, p) => sum + p.quantity, 0),
-          salesAmount: monthSales.reduce((sum, s) => sum + s.totalPrice, 0),
-          salesQty: monthSales.reduce((sum, s) => sum + s.quantity, 0),
-          expenses: monthCosts.reduce((sum, c) => sum + c.amount, 0),
-          costs: monthCosts,
-          periodLabel: `ماه ${month}/${year}`,
-        }
-      }
-      case "yearly": {
-        const yearProductions = productions.filter((p) => {
-          const [pYear] = p.date.split("/")
-          return pYear === year
-        })
-        const yearSales = sales.filter((s) => {
-          const [sYear] = s.date.split("/")
-          return sYear === year
-        })
-        const yearCosts = costs.filter((c) => {
-          const [cYear] = c.date.split("/")
-          return cYear === year
-        })
-        
-        return {
-          productionQty: yearProductions.reduce((sum, p) => sum + p.quantity, 0),
-          salesAmount: yearSales.reduce((sum, s) => sum + s.totalPrice, 0),
-          salesQty: yearSales.reduce((sum, s) => sum + s.quantity, 0),
-          expenses: yearCosts.reduce((sum, c) => sum + c.amount, 0),
-          costs: yearCosts,
-          periodLabel: `سال ${year}`,
-        }
-      }
+    }
+
+    const normalizedStart = convertToWesternDigits(startDate)
+    const normalizedEnd = convertToWesternDigits(endDate)
+
+    // Filter productions
+    const filteredProductions = productions.filter((p) => {
+      const prodDate = convertToWesternDigits(p.date)
+      return prodDate >= normalizedStart && prodDate <= normalizedEnd
+    })
+
+    // Filter sales
+    const filteredSales = sales.filter((s) => {
+      const saleDate = convertToWesternDigits(s.date)
+      return saleDate >= normalizedStart && saleDate <= normalizedEnd
+    })
+
+    // Filter costs using CostService
+    const filteredCosts = CostService.collectCostsForPeriod(normalizedStart, normalizedEnd, costs)
+
+    return {
+      filteredProductions,
+      filteredSales,
+      filteredCosts,
     }
   }
 
-  const periodData = getPeriodData()
-  const profit = periodData.salesAmount - periodData.expenses
+  const { filteredProductions, filteredSales, filteredCosts } = getFilteredData()
 
-  // Calculate stocks (always current)
+  // Calculate KPIs
+  const totalProduction = filteredProductions.reduce((sum, p) => sum + p.quantity, 0)
+  const totalSalesRevenue = filteredSales.reduce((sum, s) => sum + s.totalPrice, 0)
+  const totalCosts = filteredCosts.reduce((sum, c) => sum + c.amount, 0)
+  const netProfit = totalSalesRevenue - totalCosts
+
+  // Cost breakdown by type
+  const costBreakdown = {
+    electricity: filteredCosts.filter((c) => c.type === "electricity").reduce((sum, c) => sum + c.amount, 0),
+    water: filteredCosts.filter((c) => c.type === "water").reduce((sum, c) => sum + c.amount, 0),
+    gas: filteredCosts.filter((c) => c.type === "gas").reduce((sum, c) => sum + c.amount, 0),
+    salary: filteredCosts.filter((c) => c.type === "salary").reduce((sum, c) => sum + c.amount, 0),
+    other: filteredCosts.filter((c) => c.type === "other").reduce((sum, c) => sum + c.amount, 0),
+  }
+
+  // Current stock (GLOBAL - all time)
   const stocks = StockService.calculateAllStocks(products, productions, sales)
   const totalStock = stocks.reduce((sum, s) => sum + s.remainingStock, 0)
 
-  // Cost breakdown for the period
-  const electricityCost = periodData.costs.filter((c) => c.type === "electricity").reduce((sum, c) => sum + c.amount, 0)
-  const waterCost = periodData.costs.filter((c) => c.type === "water").reduce((sum, c) => sum + c.amount, 0)
-  const gasCost = periodData.costs.filter((c) => c.type === "gas").reduce((sum, c) => sum + c.amount, 0)
-  const salaryCost = periodData.costs.filter((c) => c.type === "salary").reduce((sum, c) => sum + c.amount, 0)
+  // Latest items in range (for activity tables)
+  const latestProductions = filteredProductions
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 10)
 
-  // Generate report for export
-  const generateReportForExport = () => {
-    switch (periodType) {
-      case "daily":
-        return ReportService.generateDailyReport(selectedDate, productions, sales, costs)
-      case "monthly":
-        return ReportService.generateMonthlyReport(month, year, products, productions, sales, costs)
-      case "weekly": {
-        // Get all dates and take last 7 days
-        const allDates = [...new Set([
-          ...productions.map(p => p.date),
-          ...sales.map(s => s.date),
-          ...costs.map(c => c.date)
-        ])].sort()
-        
-        if (allDates.length === 0) return null
-        
-        const last7Days = allDates.slice(-7)
-        const startDate = last7Days[0]
-        const endDate = last7Days[last7Days.length - 1]
-        
-        return ReportService.generateCustomReport(startDate, endDate, products, productions, sales, costs)
-      }
-      case "yearly": {
-        const startDate = `${year}/01/01`
-        const allDates = [...new Set([
-          ...productions.map(p => p.date),
-          ...sales.map(s => s.date),
-          ...costs.map(c => c.date)
-        ])].sort()
-        const endDate = allDates.length > 0 ? allDates[allDates.length - 1] : `${year}/12/29`
-        
-        return ReportService.generateCustomReport(startDate, endDate, products, productions, sales, costs)
-      }
-      default:
-        return null
+  const latestSales = filteredSales
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 10)
+
+  const latestCosts = filteredCosts
+    .sort((a, b) => {
+      // Sort by periodValue (date) descending
+      const aDate = a.periodType === "daily" ? a.periodValue : a.periodValue + "/01"
+      const bDate = b.periodType === "daily" ? b.periodValue : b.periodValue + "/01"
+      return bDate.localeCompare(aDate)
+    })
+    .slice(0, 10)
+
+  // Export handler
+  const handleExport = async () => {
+    if (!startDate || !endDate) {
+      alert("لطفاً بازه زمانی را انتخاب کنید")
+      return
     }
-  }
 
-  const handleExport = () => {
-    const report = generateReportForExport()
-    if (!report) return
-
-    if (periodType === "daily") {
-      exportReportToExcel(report as any, "daily")
-    } else {
-      exportReportToExcel(report as any, "monthly")
+    try {
+      await exportDashboardToExcel({
+        startDate,
+        endDate,
+        totalProduction,
+        totalSalesRevenue,
+        totalCosts,
+        netProfit,
+        costBreakdown,
+        filteredProductions,
+        filteredSales,
+        filteredCosts,
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      alert("خطا در ایجاد فایل Excel")
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Period Selection */}
+      {/* Date Range Selector */}
       <Card>
         <CardHeader>
-          <CardTitle>انتخاب دوره زمانی</CardTitle>
+          <CardTitle>انتخاب بازه زمانی</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col md:flex-row gap-4 items-end">
             <div className="flex-1 space-y-2">
-              <Label>نوع دوره</Label>
-              <Select
-                value={periodType}
-                onValueChange={(value: typeof periodType) => setPeriodType(value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">روزانه</SelectItem>
-                  <SelectItem value="weekly">هفتگی</SelectItem>
-                  <SelectItem value="monthly">ماهانه</SelectItem>
-                  <SelectItem value="yearly">سالانه</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="start-date">تاریخ شروع *</Label>
+              <Input
+                id="start-date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder="۱۴۰۴/۱۰/۰۱"
+                className="w-full"
+              />
             </div>
-            {periodType === "daily" && (
-              <div className="flex-1 space-y-2">
-                <Label>تاریخ</Label>
-                <Input
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  placeholder="۱۴۰۳/۱۰/۱۵"
-                />
-              </div>
-            )}
-            <Button onClick={handleExport} variant="outline">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="end-date">تاریخ پایان *</Label>
+              <Input
+                id="end-date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder="۱۴۰۴/۱۰/۳۰"
+                className="w-full"
+              />
+            </div>
+            <Button
+              onClick={handleExport}
+              variant="outline"
+              disabled={!startDate || !endDate || startDate > endDate}
+              className="w-full md:w-auto"
+            >
               <Download className="h-4 w-4 mr-2" />
               خروجی Excel
             </Button>
           </div>
+          {startDate && endDate && startDate > endDate && (
+            <p className="text-xs text-red-600 mt-2">
+              ⚠️ تاریخ شروع باید قبل از تاریخ پایان باشد
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      {/* Statistics Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Production */}
+        {/* Total Production */}
         <Card className="border-accent/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -233,13 +198,13 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
               <TrendingUp className="h-4 w-4 text-green-600" />
             </div>
             <div className="text-2xl font-bold text-foreground mb-1">
-              {formatPersianNumber(periodData.productionQty)}
+              {formatPersianNumber(totalProduction)}
             </div>
-            <div className="text-xs text-muted-foreground">تولید {periodData.periodLabel} (عدد)</div>
+            <div className="text-xs text-muted-foreground">تولید کل (عدد)</div>
           </CardContent>
         </Card>
 
-        {/* Sales */}
+        {/* Total Sales Revenue */}
         <Card className="border-green-600/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -249,18 +214,13 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
               <TrendingUp className="h-4 w-4 text-green-600" />
             </div>
             <div className="text-2xl font-bold text-green-600 mb-1">
-              {formatPersianNumber(periodData.salesAmount)}
+              {formatPersianNumber(totalSalesRevenue)}
             </div>
-            <div className="text-xs text-muted-foreground">فروش {periodData.periodLabel} (تومان)</div>
-            {periodType === "daily" && (
-              <div className="text-xs text-muted-foreground mt-1">
-                {formatPersianNumber(periodData.salesQty)} عدد فروخته شده
-              </div>
-            )}
+            <div className="text-xs text-muted-foreground">فروش کل (تومان)</div>
           </CardContent>
         </Card>
 
-        {/* Expenses */}
+        {/* Total Costs */}
         <Card className="border-red-600/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -270,36 +230,36 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
               <TrendingDown className="h-4 w-4 text-red-600" />
             </div>
             <div className="text-2xl font-bold text-red-600 mb-1">
-              {formatPersianNumber(periodData.expenses)}
+              {formatPersianNumber(totalCosts)}
             </div>
-            <div className="text-xs text-muted-foreground">هزینه {periodData.periodLabel} (تومان)</div>
+            <div className="text-xs text-muted-foreground">هزینه کل (تومان)</div>
           </CardContent>
         </Card>
 
-        {/* Profit */}
+        {/* Net Profit */}
         <Card className="border-blue-600/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                <Wallet className="h-5 w-5 text-blue-600" />
+                <DollarSign className="h-5 w-5 text-blue-600" />
               </div>
-              <TrendingUp className={`h-4 w-4 ${profit >= 0 ? "text-green-600" : "text-red-600"}`} />
+              <TrendingUp className={`h-4 w-4 ${netProfit >= 0 ? "text-green-600" : "text-red-600"}`} />
             </div>
-            <div className={`text-2xl font-bold mb-1 ${profit >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {formatPersianNumber(profit)}
+            <div className={`text-2xl font-bold mb-1 ${netProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {formatPersianNumber(netProfit)}
             </div>
-            <div className="text-xs text-muted-foreground">سود {periodData.periodLabel} (تومان)</div>
+            <div className="text-xs text-muted-foreground">سود خالص (تومان)</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Current Stock */}
+      {/* Current Stock (Global) */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Package className="h-5 w-5 text-accent" />
-              <h3 className="font-semibold">موجودی فعلی</h3>
+              <h3 className="font-semibold">موجودی فعلی (کل)</h3>
             </div>
             <div className="text-2xl font-bold text-foreground">
               {formatPersianNumber(totalStock)} عدد
@@ -318,52 +278,48 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
       </Card>
 
       {/* Cost Breakdown */}
-      {periodData.expenses > 0 && (
+      {totalCosts > 0 && (
         <Card>
           <CardContent className="p-4">
-            <h3 className="font-semibold mb-4">تفکیک هزینه‌های {periodData.periodLabel}</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {electricityCost > 0 && (
+            <h3 className="font-semibold mb-4">تفکیک هزینه‌ها</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {costBreakdown.electricity > 0 && (
                 <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm font-medium">برق</span>
-                  </div>
+                  <div className="text-sm font-medium mb-1">برق</div>
                   <div className="text-lg font-bold text-yellow-600">
-                    {formatPersianNumber(electricityCost)}
+                    {formatPersianNumber(costBreakdown.electricity)}
                   </div>
                 </div>
               )}
-              {waterCost > 0 && (
+              {costBreakdown.water > 0 && (
                 <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Droplets className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium">آب</span>
-                  </div>
+                  <div className="text-sm font-medium mb-1">آب</div>
                   <div className="text-lg font-bold text-blue-600">
-                    {formatPersianNumber(waterCost)}
+                    {formatPersianNumber(costBreakdown.water)}
                   </div>
                 </div>
               )}
-              {gasCost > 0 && (
+              {costBreakdown.gas > 0 && (
                 <div className="p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Flame className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm font-medium">گاز</span>
-                  </div>
+                  <div className="text-sm font-medium mb-1">گاز</div>
                   <div className="text-lg font-bold text-orange-600">
-                    {formatPersianNumber(gasCost)}
+                    {formatPersianNumber(costBreakdown.gas)}
                   </div>
                 </div>
               )}
-              {salaryCost > 0 && (
+              {costBreakdown.salary > 0 && (
                 <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Users className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium">حقوق</span>
-                  </div>
+                  <div className="text-sm font-medium mb-1">حقوق</div>
                   <div className="text-lg font-bold text-purple-600">
-                    {formatPersianNumber(salaryCost)}
+                    {formatPersianNumber(costBreakdown.salary)}
+                  </div>
+                </div>
+              )}
+              {costBreakdown.other > 0 && (
+                <div className="p-3 bg-gray-500/10 rounded-lg border border-gray-500/20">
+                  <div className="text-sm font-medium mb-1">سایر</div>
+                  <div className="text-lg font-bold text-gray-600">
+                    {formatPersianNumber(costBreakdown.other)}
                   </div>
                 </div>
               )}
@@ -372,42 +328,78 @@ export function Dashboard({ products, productions, sales, costs }: DashboardProp
         </Card>
       )}
 
-      {/* Profit by Product (for monthly and yearly) */}
-      {(periodType === "monthly" || periodType === "yearly") && (
+      {/* Activity Tables */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Latest Productions */}
         <Card>
-          <CardContent className="p-4">
-            <h3 className="font-semibold mb-4">سود به تفکیک محصول ({periodData.periodLabel})</h3>
-            {(() => {
-              const report = generateReportForExport()
-              if (!report || !("profitByProduct" in report)) return null
-              
-              return (
-                <div className="space-y-2">
-                  {report.profitByProduct
-                    .filter((item) => item.profit !== 0 || item.revenue > 0)
-                    .slice(0, 10)
-                    .map((item) => (
-                      <div
-                        key={item.productId}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <span className="font-medium">{item.productName}</span>
-                        <div className="text-right">
-                          <div className={`font-bold ${item.profit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {formatPersianNumber(item.profit)} تومان
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            حاشیه سود: {item.profitMargin.toFixed(1)}%
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )
-            })()}
+          <CardHeader>
+            <CardTitle className="text-sm">آخرین تولیدات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {latestProductions.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">داده‌ای یافت نشد</p>
+            ) : (
+              <div className="space-y-2">
+                {latestProductions.map((prod) => (
+                  <div key={prod.id} className="text-xs border-b pb-2">
+                    <div className="font-medium">{prod.productName}</div>
+                    <div className="text-muted-foreground">
+                      {formatPersianNumber(prod.quantity)} عدد - {prod.date}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
+
+        {/* Latest Sales */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">آخرین فروشات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {latestSales.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">داده‌ای یافت نشد</p>
+            ) : (
+              <div className="space-y-2">
+                {latestSales.map((sale) => (
+                  <div key={sale.id} className="text-xs border-b pb-2">
+                    <div className="font-medium">{sale.customerName}</div>
+                    <div className="text-muted-foreground">
+                      {formatPersianNumber(sale.totalPrice)} تومان - {sale.date}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Latest Costs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">آخرین هزینه‌ها</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {latestCosts.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">داده‌ای یافت نشد</p>
+            ) : (
+              <div className="space-y-2">
+                {latestCosts.map((cost) => (
+                  <div key={cost.id} className="text-xs border-b pb-2">
+                    <div className="font-medium">{cost.typeLabel}</div>
+                    <div className="text-muted-foreground">
+                      {formatPersianNumber(cost.amount)} تومان - {cost.periodValue}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
+

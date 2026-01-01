@@ -26,7 +26,7 @@ import {
 
 // Import new types and services
 import type { Product, Production, Cost, Sale, Invoice } from "./types"
-import { useDataPersistence } from "./hooks/useDataPersistence"
+import { useSupabaseData } from "./hooks/useSupabaseData"
 import { Dashboard } from "./components/Dashboard"
 import { ProductManagement } from "./components/ProductManagement"
 import { ProductionManagement } from "./components/ProductionManagement"
@@ -34,102 +34,169 @@ import { CostManagement } from "./components/CostManagement"
 import { SalesManagement } from "./components/SalesManagement"
 import { InvoiceManagement } from "./components/InvoiceManagement"
 import { getTodayPersianDate } from "./utils"
+import { AuthProvider, useAuth } from "./providers/AuthProvider"
+import { useToast } from "@/components/ui/use-toast"
 
-export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+function AdminContent() {
+  const { isAuthenticated, isLoading, login, logout } = useAuth()
+  const { toast } = useToast()
   const [credentials, setCredentials] = useState({ username: "", password: "" })
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
-  // Use new data persistence hook
+  // Use Supabase data hook
   const {
     products,
-    setProducts,
     productions,
-    setProductions,
     costs,
-    setCosts,
     sales,
-    setSales,
     invoices,
-    setInvoices,
-  } = useDataPersistence()
+    loading,
+    error,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    addProduction,
+    deleteProduction,
+    addCost,
+    deleteCost,
+    addSale,
+    addSales,
+    deleteSale,
+    addInvoice,
+    updateInvoice,
+    deleteInvoice,
+  } = useSupabaseData()
 
-  // Handlers for new system
-  const handleAddProduct = (productData: Omit<Product, "id" | "createdAt" | "updatedAt">) => {
-    const newProduct: Product = {
-      ...productData,
-      id: `prod-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // Handlers using Supabase
+  const handleAddProduct = async (productData: Omit<Product, "id" | "createdAt" | "updatedAt">) => {
+    try {
+      await addProduct(productData)
+    } catch (error) {
+      alert("خطا در افزودن محصول: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
     }
-    setProducts([...products, newProduct])
   }
 
-  const handleUpdateProduct = (id: string, updates: Partial<Product>) => {
-    setProducts(products.map((p) => (p.id === id ? { ...p, ...updates } : p)))
-  }
-
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id))
-  }
-
-  const handleAddProduction = (productionData: Omit<Production, "id" | "createdAt">) => {
-    const newProduction: Production = {
-      ...productionData,
-      id: `prod-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+  const handleUpdateProduct = async (id: string, updates: Partial<Product>) => {
+    try {
+      await updateProduct(id, updates)
+    } catch (error) {
+      alert("خطا در بروزرسانی محصول: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
     }
-    setProductions([...productions, newProduction])
   }
 
-  const handleDeleteProduction = (id: string) => {
-    setProductions(productions.filter((p) => p.id !== id))
-  }
-
-  const handleAddCost = (costData: Omit<Cost, "id" | "createdAt">) => {
-    const newCost: Cost = {
-      ...costData,
-      id: `cost-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteProduct(id)
+    } catch (error) {
+      alert("خطا در حذف محصول: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
     }
-    setCosts([...costs, newCost])
   }
 
-  const handleDeleteCost = (id: string) => {
-    setCosts(costs.filter((c) => c.id !== id))
-  }
-
-  const handleAddSale = (saleData: Omit<Sale, "id" | "createdAt">) => {
-    const newSale: Sale = {
-      ...saleData,
-      id: `sale-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+  const handleAddProduction = async (productionData: Omit<Production, "id" | "createdAt">) => {
+    try {
+      await addProduction(productionData)
+    } catch (error) {
+      alert("خطا در ثبت تولید: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
     }
-    setSales([...sales, newSale])
   }
 
-  const handleDeleteSale = (id: string) => {
-    setSales(sales.filter((s) => s.id !== id))
+  const handleDeleteProduction = async (id: string) => {
+    try {
+      await deleteProduction(id)
+    } catch (error) {
+      alert("خطا در حذف رکورد تولید: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
   }
 
-  const handleAddInvoice = (invoice: Invoice) => {
-    setInvoices([...invoices, invoice])
+  const handleAddCost = async (costData: Omit<Cost, "id" | "createdAt">) => {
+    try {
+      await addCost(costData)
+    } catch (error) {
+      alert("خطا در افزودن هزینه: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
   }
 
-  const handleUpdateInvoice = (id: string, updates: Partial<Invoice>) => {
-    setInvoices(invoices.map((inv) => (inv.id === id ? { ...inv, ...updates } : inv)))
+  const handleDeleteCost = async (id: string) => {
+    try {
+      await deleteCost(id)
+    } catch (error) {
+      alert("خطا در حذف هزینه: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
   }
 
-  const handleDeleteInvoice = (id: string) => {
-    setInvoices(invoices.filter((inv) => inv.id !== id))
+  const handleAddSale = async (saleData: Omit<Sale, "id" | "createdAt">) => {
+    try {
+      await addSale(saleData)
+    } catch (error) {
+      alert("خطا در ثبت فروش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
   }
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleDeleteSale = async (id: string) => {
+    try {
+      await deleteSale(id)
+    } catch (error) {
+      alert("خطا در حذف فروش: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
+  }
+
+  const handleAddInvoice = async (invoice: Invoice) => {
+    try {
+      await addInvoice(invoice)
+    } catch (error) {
+      alert("خطا در ایجاد فاکتور: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
+  }
+
+  const handleUpdateInvoice = async (id: string, updates: Partial<Invoice>) => {
+    try {
+      await updateInvoice(id, updates)
+    } catch (error) {
+      alert("خطا در بروزرسانی فاکتور: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
+  }
+
+  const handleDeleteInvoice = async (id: string) => {
+    try {
+      await deleteInvoice(id)
+    } catch (error) {
+      alert("خطا در حذف فاکتور: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+    }
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (credentials.username === "admin" && credentials.password === "admin123") {
-      setIsAuthenticated(true)
+    setIsLoggingIn(true)
+    
+    const result = await login(credentials.username, credentials.password)
+    
+    if (!result.success) {
+      toast({
+        title: "خطا در ورود",
+        description: result.error || "نام کاربری یا رمز عبور اشتباه است",
+        variant: "destructive",
+      })
     } else {
-      alert("نام کاربری یا رمز عبور اشتباه است")
+      toast({
+        title: "ورود موفق",
+        description: "با موفقیت وارد شدید",
+      })
     }
+    
+    setIsLoggingIn(false)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">در حال بررسی احراز هویت...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {
@@ -166,11 +233,39 @@ export default function AdminPage() {
                   className="h-12"
                 />
               </div>
-              <Button type="submit" className="w-full h-12 text-base">
-                ورود به پنل
+              <Button type="submit" className="w-full h-12 text-base" disabled={isLoggingIn}>
+                {isLoggingIn ? "در حال ورود..." : "ورود به پنل"}
               </Button>
-              <p className="text-xs text-center text-muted-foreground">دمو: admin / admin123</p>
             </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">در حال بارگذاری داده‌ها...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center" dir="rtl">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <p className="text-red-600 mb-4">خطا در بارگذاری داده‌ها</p>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>تلاش مجدد</Button>
           </CardContent>
         </Card>
       </div>
@@ -193,7 +288,7 @@ export default function AdminPage() {
                   مشاهده سایت
                 </a>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setIsAuthenticated(false)}>
+              <Button variant="ghost" size="sm" onClick={logout}>
                 خروج
               </Button>
             </div>
@@ -204,30 +299,26 @@ export default function AdminPage() {
       {/* Admin Content */}
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue="dashboard" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6 h-auto">
+          <TabsList className="grid w-full grid-cols-5 h-auto">
             <TabsTrigger value="dashboard" className="gap-2 py-3">
               <BarChart3 className="h-4 w-4" />
               داشبورد
-            </TabsTrigger>
-            <TabsTrigger value="products" className="gap-2 py-3">
-              <Package className="h-4 w-4" />
-              محصولات
             </TabsTrigger>
             <TabsTrigger value="production" className="gap-2 py-3">
               <Factory className="h-4 w-4" />
               تولید
             </TabsTrigger>
+            <TabsTrigger value="sales-invoices" className="gap-2 py-3">
+              <ShoppingCart className="h-4 w-4" />
+              فروشات / فاکتورها
+            </TabsTrigger>
             <TabsTrigger value="costs" className="gap-2 py-3">
               <DollarSign className="h-4 w-4" />
               هزینه‌ها
             </TabsTrigger>
-            <TabsTrigger value="sales" className="gap-2 py-3">
-              <ShoppingCart className="h-4 w-4" />
-              فروشات
-            </TabsTrigger>
-            <TabsTrigger value="invoices" className="gap-2 py-3">
-              <FileText className="h-4 w-4" />
-              فاکتورها
+            <TabsTrigger value="products" className="gap-2 py-3">
+              <Package className="h-4 w-4" />
+              محصولات
             </TabsTrigger>
           </TabsList>
 
@@ -266,35 +357,51 @@ export default function AdminPage() {
             />
           </TabsContent>
 
-          {/* Sales Tab */}
-          <TabsContent value="sales" className="space-y-4">
-            <SalesManagement
-              products={products}
-              productions={productions}
-              sales={sales}
-              onAdd={handleAddSale}
-              onDelete={handleDeleteSale}
-            />
-          </TabsContent>
-
-          {/* Invoices Tab */}
-          <TabsContent value="invoices" className="space-y-4">
-            <InvoiceManagement
-              products={products}
-              productions={productions}
-              invoices={invoices}
-              sales={sales}
-              onAdd={handleAddInvoice}
-              onUpdate={handleUpdateInvoice}
-              onDelete={handleDeleteInvoice}
-              onAddSales={(newSales) => {
-                // Add multiple sales at once
-                newSales.forEach((saleData) => handleAddSale(saleData))
-              }}
-            />
+          {/* Sales / Invoices Tab */}
+          <TabsContent value="sales-invoices" className="space-y-4">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold mb-4">فاکتورها</h2>
+                <InvoiceManagement
+                  products={products}
+                  productions={productions}
+                  invoices={invoices}
+                  sales={sales}
+                  onAdd={handleAddInvoice}
+                  onUpdate={handleUpdateInvoice}
+                  onDelete={handleDeleteInvoice}
+                  onAddSales={async (newSales) => {
+                    // Add multiple sales at once
+                    try {
+                      await addSales(newSales)
+                    } catch (error) {
+                      alert("خطا در ثبت فروشات: " + (error instanceof Error ? error.message : "خطای ناشناخته"))
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold mb-4">فروشات مستقیم</h2>
+                <SalesManagement
+                  products={products}
+                  productions={productions}
+                  sales={sales}
+                  onAdd={handleAddSale}
+                  onDelete={handleDeleteSale}
+                />
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
     </div>
+  )
+}
+
+export default function AdminPage() {
+  return (
+    <AuthProvider>
+      <AdminContent />
+    </AuthProvider>
   )
 }

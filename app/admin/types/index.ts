@@ -32,16 +32,20 @@ export interface Production {
 /**
  * Cost Record
  * Production costs: electricity, water, gas, salaries
+ * Period-based system: costs are linked to periods, not products
  */
 export interface Cost {
   id: string
   type: "electricity" | "water" | "gas" | "salary" | "other"
   typeLabel: string
   amount: number
-  date: string
+  periodType: "daily" | "monthly"
+  periodValue: string // YYYY/MM/DD for daily, YYYY/MM for monthly
   description: string
-  productId?: string // Optional: link to specific product
-  productionDate?: string // Optional: link to production day
+  // Legacy fields (deprecated, kept for backward compatibility)
+  date?: string // DEPRECATED: Use periodValue instead
+  productId?: string // DEPRECATED: No longer used
+  productionDate?: string // DEPRECATED: No longer used
   createdAt: string
 }
 

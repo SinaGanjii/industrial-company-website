@@ -1,6 +1,22 @@
 // Export Utilities for PDF and Excel
 
-import type { Invoice, DailyReport, MonthlyReport } from "../types"
+import type { Invoice, DailyReport, MonthlyReport, Production, Sale, Cost } from "../types"
+
+// Dynamic import for xlsx (to avoid SSR issues)
+// @ts-ignore - xlsx types are included in the package
+let xlsxModule: any = null
+async function getXLSX(): Promise<any> {
+  if (!xlsxModule) {
+    try {
+      // @ts-ignore
+      xlsxModule = await import("xlsx")
+    } catch (error) {
+      console.error("Failed to load xlsx:", error)
+      throw new Error("کتابخانه Excel بارگذاری نشد. لطفاً صفحه را رفرش کنید.")
+    }
+  }
+  return xlsxModule
+}
 
 /**
  * Export invoice to PDF (simulation)
@@ -68,7 +84,10 @@ export function exportReportToExcel(
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `${type}-report-${report.date || `${report.year}-${report.month}`}.csv`
+  const filename = type === "daily" 
+    ? `گزارش-روزانه-${(report as DailyReport).date}.csv`
+    : `گزارش-ماهانه-${(report as MonthlyReport).year}-${(report as MonthlyReport).month}.csv`
+  a.download = filename
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -138,9 +157,6 @@ ${monthly.costs.byType.map((c) => `${c.typeLabel}: ${c.amount.toLocaleString("fa
 مجموع هزینه: ${monthly.costs.totalAmount.toLocaleString("fa-IR")}
 
 سود خالص: ${monthly.profit.toLocaleString("fa-IR")}
-
-سود به تفکیک محصول:
-${monthly.profitByProduct.map((p) => `${p.productName}: ${p.profit.toLocaleString("fa-IR")}`).join("\n")}
 `
   }
 }
@@ -152,5 +168,169 @@ function getStatusLabel(status: Invoice["status"]): string {
     paid: "پرداخت شده",
   }
   return labels[status]
+}
+
+/**
+ * Export Dashboard to Excel with 3 sheets (Professional Enterprise Level):
+ * 1. Summary: start_date, end_date, total_production_qty, total_sales_revenue, total_costs, net_profit
+ * 2. Costs: breakdown by type + list of cost rows
+ * 3. Raw Data: productions + sales rows
+ */
+export async function exportDashboardToExcel(data: {
+  startDate: string
+  endDate: string
+  totalProduction: number
+  totalSalesRevenue: number
+  totalCosts: number
+  netProfit: number
+  costBreakdown: {
+    electricity: number
+    water: number
+    gas: number
+    salary: number
+    other: number
+  }
+  filteredProductions: Production[]
+  filteredSales: Sale[]
+  filteredCosts: Cost[]
+}): Promise<void> {
+  try {
+    const XLSX = await getXLSX()
+    // Create a new workbook
+    const wb = XLSX.utils.book_new()
+
+    // ============================================
+    // SHEET 1: SUMMARY (خلاصه)
+    // ============================================
+    const summaryData = [
+      ["گزارش خلاصه", ""],
+      [],
+      ["تاریخ شروع", data.startDate],
+      ["تاریخ پایان", data.endDate],
+      [],
+      ["تولید کل (عدد)", formatPersianNumber(data.totalProduction)],
+      ["فروش کل (تومان)", formatPersianNumber(data.totalSalesRevenue)],
+      ["هزینه کل (تومان)", formatPersianNumber(data.totalCosts)],
+      ["سود خالص (تومان)", formatPersianNumber(data.netProfit)],
+    ]
+
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
+    
+    // Set column widths
+    ws1["!cols"] = [{ wch: 25 }, { wch: 20 }]
+    
+    // Add to workbook
+    XLSX.utils.book_append_sheet(wb, ws1, "خلاصه")
+
+    // ============================================
+    // SHEET 2: COSTS (هزینه‌ها)
+    // ============================================
+    const costsData = [
+      // Header
+      ["تفکیک هزینه‌ها", "", "", ""],
+      [],
+      // Breakdown by type
+      ["نوع هزینه", "مبلغ (تومان)", "", ""],
+      ["برق", formatPersianNumber(data.costBreakdown.electricity), "", ""],
+      ["آب", formatPersianNumber(data.costBreakdown.water), "", ""],
+      ["گاز", formatPersianNumber(data.costBreakdown.gas), "", ""],
+      ["حقوق", formatPersianNumber(data.costBreakdown.salary), "", ""],
+      ["سایر", formatPersianNumber(data.costBreakdown.other), "", ""],
+      [],
+      // List of costs
+      ["لیست هزینه‌ها", "", "", ""],
+      [],
+      ["تاریخ/دوره", "نوع", "مبلغ (تومان)", "شرح"],
+      // Cost rows
+      ...data.filteredCosts.map((cost) => [
+        cost.periodValue,
+        cost.typeLabel,
+        formatPersianNumber(cost.amount),
+        cost.description,
+      ]),
+    ]
+
+    const ws2 = XLSX.utils.aoa_to_sheet(costsData)
+    
+    // Set column widths
+    ws2["!cols"] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 30 }]
+    
+    // Add to workbook
+    XLSX.utils.book_append_sheet(wb, ws2, "هزینه‌ها")
+
+    // ============================================
+    // SHEET 3: RAW DATA (داده‌های خام)
+    // ============================================
+    const rawDataRows: any[][] = []
+    
+    // Productions section
+    rawDataRows.push(["تولیدات", "", "", ""])
+    rawDataRows.push([])
+    rawDataRows.push(["تاریخ", "محصول", "تعداد", "شیفت"])
+    rawDataRows.push(
+      ...data.filteredProductions.map((prod) => [
+        prod.date,
+        prod.productName,
+        formatPersianNumber(prod.quantity),
+        prod.shift,
+      ])
+    )
+    
+    rawDataRows.push([])
+    
+    // Sales section
+    rawDataRows.push(["فروشات", "", "", "", "", ""])
+    rawDataRows.push([])
+    rawDataRows.push(["تاریخ", "مشتری", "محصول", "تعداد", "قیمت واحد", "مجموع"])
+    rawDataRows.push(
+      ...data.filteredSales.map((sale) => [
+        sale.date,
+        sale.customerName,
+        sale.productName,
+        formatPersianNumber(sale.quantity),
+        formatPersianNumber(sale.unitPrice),
+        formatPersianNumber(sale.totalPrice),
+      ])
+    )
+
+    const ws3 = XLSX.utils.aoa_to_sheet(rawDataRows)
+    
+    // Set column widths
+    ws3["!cols"] = [
+      { wch: 12 }, // تاریخ
+      { wch: 20 }, // محصول/مشتری
+      { wch: 15 }, // تعداد
+      { wch: 10 }, // شیفت
+      { wch: 15 }, // قیمت واحد
+      { wch: 15 }, // مجموع
+    ]
+    
+    // Add to workbook
+    XLSX.utils.book_append_sheet(wb, ws3, "داده‌های خام")
+
+    // ============================================
+    // EXPORT FILE
+    // ============================================
+    // Generate filename with Persian dates
+    const filename = `گزارش-${data.startDate}-تا-${data.endDate}.xlsx`
+    
+    // Write file with options for better Persian support
+    XLSX.writeFile(wb, filename, {
+      bookType: "xlsx",
+      type: "array",
+    })
+  } catch (error) {
+    console.error("Error exporting to Excel:", error)
+    alert("خطا در ایجاد فایل Excel. لطفاً دوباره تلاش کنید.")
+  }
+}
+
+/**
+ * Format number to Persian digits for display
+ */
+function formatPersianNumber(num: number): string {
+  const persianDigits = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
+  const numStr = num.toLocaleString("fa-IR")
+  return numStr
 }
 
